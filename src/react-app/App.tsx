@@ -83,6 +83,7 @@ function App() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [businessPartners, setBusinessPartners] = useState<BusinessPartner[]>([]);
   const [quests, setQuests] = useState<Quest[]>([]);
+  const [userQuests, setUserQuests] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessPartner | null>(null);
   const [activeTab, setActiveTab] = useState<'explore' | 'quests' | 'profile' | 'leaderboard'>('explore');
@@ -115,8 +116,8 @@ function App() {
         },
         (error) => {
           console.error('Error getting location:', error);
-          // Default to Salt Lake City coordinates
-          const defaultCoords = { lat: 40.7589, lng: -111.8883 };
+          // Default to Meredith coordinates for the sculpture walk
+          const defaultCoords = { lat: 43.6578, lng: -71.5003 };
           setUserLocation(defaultCoords);
           fetchNearbyLocations(defaultCoords.lat, defaultCoords.lng);
           fetchNearbyBusinesses(defaultCoords.lat, defaultCoords.lng);
@@ -125,11 +126,14 @@ function App() {
     }
 
     fetchQuests();
+    if (user) {
+      fetchUserQuests(user.id);
+    }
     setIsLoading(false);
     
     // Hide welcome screen after 3 seconds
     setTimeout(() => setShowWelcome(false), 3000);
-  }, []);
+  }, [user]);
 
   const fetchUser = async (userId: string) => {
     try {
@@ -147,6 +151,78 @@ function App() {
       }
     } catch (error) {
       console.error('Error fetching user:', error);
+    }
+  };
+
+  const fetchUserQuests = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/users/${userId}/quests`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserQuests(data);
+      }
+    } catch (error) {
+      console.error('Error fetching user quests:', error);
+    }
+  };
+
+  const startQuest = async (questId: number) => {
+    if (!user) return;
+    
+    try {
+      const response = await fetch(`/api/quests/${questId}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id })
+      });
+      
+      if (response.ok) {
+        fetchUserQuests(user.id);
+        // Show success message
+        alert('Quest started! Check the quests tab to see your progress.');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to start quest');
+      }
+    } catch (error) {
+      console.error('Error starting quest:', error);
+      alert('Failed to start quest');
+    }
+  };
+
+  const completeQuestStep = async (questId: number, stepNumber: number, photoUrl?: string) => {
+    if (!user || !userLocation) return;
+    
+    try {
+      const response = await fetch(`/api/quests/${questId}/complete-step`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          step_number: stepNumber,
+          latitude: userLocation.lat,
+          longitude: userLocation.lng,
+          photo_url: photoUrl
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        fetchUserQuests(user.id);
+        fetchUser(user.id);
+        
+        if (result.quest_completed) {
+          alert(`🎉 ${result.message}`);
+        } else {
+          alert(`✅ Step completed! Progress: ${result.progress}`);
+        }
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to complete step');
+      }
+    } catch (error) {
+      console.error('Error completing quest step:', error);
+      alert('Failed to complete step');
     }
   };
 
@@ -487,8 +563,8 @@ function App() {
                 <QuestCard
                   key={quest.id}
                   quest={quest}
-                  onStartQuest={() => {}}
-                  isStarted={false}
+                  onStartQuest={() => startQuest(quest.id)}
+                  isStarted={userQuests.some(uq => uq.quest_id === quest.id)}
                 />
               ))}
             </div>

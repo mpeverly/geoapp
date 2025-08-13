@@ -576,34 +576,197 @@ app.get("/api/quests", async (c) => {
   return c.json(quests.results);
 });
 
-app.get("/api/quests/:id/steps", async (c) => {
+app.get("/api/quests/:id", async (c) => {
   const questId = c.req.param("id");
-  const stmt = c.env.DB.prepare(`
-    SELECT qs.*, l.name as location_name, bp.name as business_name 
-    FROM quest_steps qs 
-    LEFT JOIN locations l ON qs.target_location_id = l.id 
-    LEFT JOIN business_partners bp ON qs.target_business_id = bp.id 
-    WHERE qs.quest_id = ? 
+  const stmt = c.env.DB.prepare("SELECT * FROM quests WHERE id = ?");
+  const quest = await stmt.bind(questId).first();
+  
+  if (!quest) {
+    return c.json({ error: "Quest not found" }, 404);
+  }
+  
+  // Get quest steps
+  const stepsStmt = c.env.DB.prepare(`
+    SELECT qs.*, l.name as location_name, l.latitude, l.longitude, l.radius_meters
+    FROM quest_steps qs
+    LEFT JOIN locations l ON qs.target_location_id = l.id
+    WHERE qs.quest_id = ?
     ORDER BY qs.step_number
   `);
-  const steps = await stmt.bind(questId).all();
-  return c.json(steps.results);
+  const steps = await stepsStmt.bind(questId).all();
+  
+  return c.json({
+    ...quest,
+    steps: steps.results
+  });
+});
+
+app.post("/api/quests/:id/start", async (c) => {
+  const questId = c.req.param("id");
+  const { user_id } = await c.req.json();
+  
+  if (!user_id) {
+    return c.json({ error: "User ID is required" }, 400);
+  }
+  
+  // Check if user already has this quest active
+  const existingStmt = c.env.DB.prepare("SELECT * FROM user_quests WHERE user_id = ? AND quest_id = ? AND status = 'active'");
+  const existing = await existingStmt.bind(user_id, questId).first();
+  
+  if (existing) {
+    return c.json({ error: "Quest already in progress" }, 400);
+  }
+  
+  // Start the quest
+  const startStmt = c.env.DB.prepare("INSERT INTO user_quests (user_id, quest_id) VALUES (?, ?) RETURNING *");
+  const userQuest = await startStmt.bind(user_id, questId).first();
+  
+  return c.json(userQuest);
+});
+
+app.post("/api/quests/:id/complete-step", async (c) => {
+  const questId = c.req.param("id");
+  const { user_id, step_number, latitude, longitude, photo_url } = await c.req.json();
+  
+  if (!user_id || !step_number || !latitude || !longitude) {
+    return c.json({ error: "User ID, step number, latitude, and longitude are required" }, 400);
+  }
+  
+  // Get the user quest
+  const userQuestStmt = c.env.DB.prepare("SELECT * FROM user_quests WHERE user_id = ? AND quest_id = ? AND status = 'active'");
+  const userQuest = await userQuestStmt.bind(user_id, questId).first();
+  
+  if (!userQuest) {
+    return c.json({ error: "No active quest found" }, 404);
+  }
+  
+  // Get the quest step
+  const stepStmt = c.env.DB.prepare("SELECT * FROM quest_steps WHERE quest_id = ? AND step_number = ?");
+  const step = await stepStmt.bind(questId, step_number).first();
+  
+  if (!step) {
+    return c.json({ error: "Quest step not found" }, 404);
+  }
+  
+  // Verify location if this step has a target location
+  let verified = false;
+  let distance_meters = null;
+  
+  if (step.target_location_id) {
+    const locationStmt = c.env.DB.prepare("SELECT latitude, longitude, radius_meters FROM locations WHERE id = ?");
+    const location = await locationStmt.bind(step.target_location_id).first();
+    
+    if (location) {
+      // Calculate distance using Haversine formula
+      const R = 6371000; // Earth's radius in meters
+      const dLat = (latitude - location.latitude) * Math.PI / 180;
+      const dLon = (longitude - location.longitude) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(location.latitude * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const distanceCalc = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      distance_meters = R * distanceCalc;
+      
+      if (distance_meters <= location.radius_meters) {
+        verified = true;
+      }
+    }
+  } else {
+    // For steps without specific locations, just require photo
+    verified = true;
+  }
+  
+  if (!verified) {
+    return c.json({ 
+      error: "You must be at the correct location to complete this step",
+      distance_meters,
+      required_radius: step.target_location_id ? 50 : null
+    }, 400);
+  }
+  
+  // Create check-in for this step
+  const checkinStmt = c.env.DB.prepare(`
+    INSERT INTO checkins (user_id, location_id, latitude, longitude, distance_meters, points_earned, verified) 
+    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *
+  `);
+  const checkin = await checkinStmt.bind(
+    user_id, 
+    step.target_location_id, 
+    latitude, 
+    longitude, 
+    distance_meters, 
+    step.points_reward, 
+    verified
+  ).first();
+  
+  // Mark quest step as completed
+  const completeStepStmt = c.env.DB.prepare(`
+    INSERT INTO user_quest_steps (user_quest_id, quest_step_id, status, completed_at, photo_url, checkin_id)
+    VALUES (?, ?, 'completed', CURRENT_TIMESTAMP, ?, ?)
+  `);
+  await completeStepStmt.bind(userQuest.id, step.id, photo_url, checkin.id).run();
+  
+  // Update user points
+  const updatePointsStmt = c.env.DB.prepare("UPDATE users SET points = points + ? WHERE id = ?");
+  await updatePointsStmt.bind(step.points_reward, user_id).run();
+  
+  // Check if quest is complete
+  const totalStepsStmt = c.env.DB.prepare("SELECT COUNT(*) as total FROM quest_steps WHERE quest_id = ?");
+  const totalSteps = await totalStepsStmt.bind(questId).first();
+  
+  const completedStepsStmt = c.env.DB.prepare(`
+    SELECT COUNT(*) as completed FROM user_quest_steps 
+    WHERE user_quest_id = ? AND status = 'completed'
+  `);
+  const completedSteps = await completedStepsStmt.bind(userQuest.id).first();
+  
+  if (completedSteps.completed >= totalSteps.total) {
+    // Quest completed!
+    const questStmt = c.env.DB.prepare("SELECT points_reward FROM quests WHERE id = ?");
+    const quest = await questStmt.bind(questId).first();
+    
+    const completeQuestStmt = c.env.DB.prepare(`
+      UPDATE user_quests 
+      SET status = 'completed', completed_at = CURRENT_TIMESTAMP, points_earned = ?
+      WHERE id = ?
+    `);
+    await completeQuestStmt.bind(quest.points_reward, userQuest.id).run();
+    
+    // Award quest completion points
+    await updatePointsStmt.bind(quest.points_reward, user_id).run();
+    
+    return c.json({
+      step_completed: true,
+      quest_completed: true,
+      points_earned: step.points_reward + quest.points_reward,
+      message: "Congratulations! You've completed the Meredith Sculpture Walk!"
+    });
+  }
+  
+  return c.json({
+    step_completed: true,
+    quest_completed: false,
+    points_earned: step.points_reward,
+    progress: `${completedSteps.completed + 1}/${totalSteps.total}`
+  });
 });
 
 app.get("/api/users/:id/quests", async (c) => {
   const userId = c.req.param("id");
+  
   const stmt = c.env.DB.prepare(`
     SELECT uq.*, q.name, q.description, q.points_reward,
-           COUNT(qsc.id) as completed_steps,
-           (SELECT COUNT(*) FROM quest_steps WHERE quest_id = q.id) as total_steps
-    FROM user_quests uq 
-    JOIN quests q ON uq.quest_id = q.id 
-    LEFT JOIN quest_step_completions qsc ON uq.id = qsc.user_quest_id 
-    WHERE uq.user_id = ? 
-    GROUP BY uq.id
+           (SELECT COUNT(*) FROM quest_steps WHERE quest_id = q.id) as total_steps,
+           (SELECT COUNT(*) FROM user_quest_steps uqs 
+            JOIN quest_steps qs ON uqs.quest_step_id = qs.id 
+            WHERE uqs.user_quest_id = uq.id AND uqs.status = 'completed') as completed_steps
+    FROM user_quests uq
+    JOIN quests q ON uq.quest_id = q.id
+    WHERE uq.user_id = ?
     ORDER BY uq.started_at DESC
   `);
   const userQuests = await stmt.bind(userId).all();
+  
   return c.json(userQuests.results);
 });
 
