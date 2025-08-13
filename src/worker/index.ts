@@ -391,17 +391,19 @@ app.get("/api/locations/nearby", async (c) => {
     return c.json({ error: "Latitude and longitude are required" }, 400);
   }
   
-  // Using Haversine formula approximation for SQLite
+  // Using a subquery to calculate distance and filter
   const stmt = c.env.DB.prepare(`
     SELECT *, 
     (6371000 * acos(cos(radians(?)) * cos(radians(latitude)) * 
     cos(radians(longitude) - radians(?)) + sin(radians(?)) * 
     sin(radians(latitude)))) as distance_meters
     FROM locations 
-    HAVING distance_meters <= ?
+    WHERE (6371000 * acos(cos(radians(?)) * cos(radians(latitude)) * 
+    cos(radians(longitude) - radians(?)) + sin(radians(?)) * 
+    sin(radians(latitude)))) <= ?
     ORDER BY distance_meters
   `);
-  const locations = await stmt.bind(lat, lon, lat, radius).all();
+  const locations = await stmt.bind(lat, lon, lat, lat, lon, lat, radius).all();
   return c.json(locations.results);
 });
 
@@ -421,16 +423,19 @@ app.get("/api/partners/nearby", async (c) => {
     return c.json({ error: "Latitude and longitude are required" }, 400);
   }
   
+  // Using a subquery to calculate distance and filter
   const stmt = c.env.DB.prepare(`
     SELECT *, 
     (6371000 * acos(cos(radians(?)) * cos(radians(latitude)) * 
     cos(radians(longitude) - radians(?)) + sin(radians(?)) * 
     sin(radians(latitude)))) as distance_meters
     FROM business_partners 
-    HAVING distance_meters <= ?
+    WHERE (6371000 * acos(cos(radians(?)) * cos(radians(latitude)) * 
+    cos(radians(longitude) - radians(?)) + sin(radians(?)) * 
+    sin(radians(latitude)))) <= ?
     ORDER BY distance_meters
   `);
-  const partners = await stmt.bind(lat, lon, lat, radius).all();
+  const partners = await stmt.bind(lat, lon, lat, lat, lon, lat, radius).all();
   return c.json(partners.results);
 });
 
