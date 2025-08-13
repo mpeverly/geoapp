@@ -20,6 +20,7 @@ build/
 # Wrangler configuration with secrets
 wrangler.toml
 wrangler.json
+wrangler.toml.backup
 
 # Cloudflare credentials
 .wrangler/
