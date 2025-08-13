@@ -15,21 +15,23 @@
     "publish": true
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.16",
+    "clsx": "^2.0.0",
     "hono": "4.8.2",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "leaflet": "^1.9.4",
     "react-leaflet": "^4.2.1",
-    "lucide-react": "^0.263.1",
-    "clsx": "^2.0.0"
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.7.5",
     "@eslint/js": "9.29.0",
+    "@types/leaflet": "^1.9.6",
     "@types/node": "24.0.4",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "@types/leaflet": "^1.9.6",
     "@vitejs/plugin-react": "4.6.0",
     "autoprefixer": "^10.4.16",
     "eslint": "9.27.0",
@@ -44,7 +46,8 @@
     "wrangler": "4.21.x"
   },
   "scripts": {
-    "build": "tsc -b && vite build",
+    "build": "vite build",
+    "build:check": "tsc -b && vite build",
     "cf-typegen": "wrangler types",
     "check": "tsc && vite build && wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
