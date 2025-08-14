@@ -23,14 +23,14 @@ compatibility_date = "2024-03-19"
 compatibility_flags = ["nodejs_compat"]
 
 [env.development]
-vars = { 
+vars = {
   ENVIRONMENT = "development",
   SHOPIFY_STORE_DOMAIN = "your-store.myshopify.com",
   SHOPIFY_ACCESS_TOKEN = "your_admin_api_access_token_here"
 }
 
 [env.production]
-vars = { 
+vars = {
   ENVIRONMENT = "production",
   SHOPIFY_STORE_DOMAIN = "your-store.myshopify.com",
   SHOPIFY_ACCESS_TOKEN = "your_admin_api_access_token_here"

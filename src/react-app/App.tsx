@@ -17,37 +17,13 @@ import {
   Sparkles,
   Settings
 } from "lucide-react";
-import { LocationMap } from "./components/LocationMap";
-import { CheckInCard } from "./components/CheckInCard";
-import { QuestCard } from "./components/QuestCard";
-import { AdminPanel } from "./components/AdminPanel";
-import { QuestTracker } from "./components/QuestTracker";
+import { LocationMap } from "./features/locations/components/LocationMap";
+import { CheckInCard } from "./features/locations/components/CheckInCard";
+import { QuestCard } from "./features/quests/components/QuestCard";
+import { AdminPanel } from "./features/admin/components/AdminPanel";
+import { QuestTracker } from "./features/quests/components/QuestTracker";
 
-interface User {
-  id: number;
-  email: string;
-  name: string;
-  points: number;
-  shopify_customer_id?: string;
-  avatar_url?: string;
-  level?: number;
-  experience?: number;
-  achievements?: number;
-  checkins?: number;
-}
-
-interface Location {
-  id: number;
-  name: string;
-  description: string;
-  latitude: number;
-  longitude: number;
-  category: string;
-  points_reward: number;
-  distance_meters?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
-  estimated_time?: number;
-}
+import { User, Location, Quest } from "./shared/types";
 
 interface BusinessPartner {
   id: number;
@@ -59,24 +35,6 @@ interface BusinessPartner {
   points_reward: number;
   distance_meters?: number;
   special_offer?: string;
-}
-
-interface Quest {
-  id: number;
-  name: string;
-  description: string;
-  points_reward: number;
-  is_active: boolean;
-  difficulty?: 'easy' | 'medium' | 'hard';
-  estimated_time?: number;
-  steps_required?: number;
-  steps_completed?: number;
-  category?: string;
-  media_urls?: string;
-  tags?: string;
-  requirements?: string;
-  instructions?: string;
-  location_area?: string;
 }
 
 function App() {
