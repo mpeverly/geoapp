@@ -46,11 +46,11 @@
     "wrangler": "4.21.x"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && npx esbuild src/worker/index.ts --bundle --format=esm --outfile=dist/worker.js --platform=neutral",
     "build:check": "tsc -b && vite build",
     "cf-typegen": "wrangler types",
     "check": "tsc && vite build && wrangler deploy --dry-run",
-    "deploy": "wrangler deploy",
+    "deploy": "npm run build && wrangler deploy",
     "dev": "vite",
     "lint": "eslint .",
     "preview": "npm run build && vite preview"
