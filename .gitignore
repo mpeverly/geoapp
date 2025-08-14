@@ -25,6 +25,9 @@ wrangler.toml.backup
 # Cloudflare credentials
 .wrangler/
 
+# But include template files
+!wrangler.toml.template
+
 # IDE files
 .vscode/
 .idea/
