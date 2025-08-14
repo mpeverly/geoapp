@@ -856,17 +856,7 @@ app.post("/api/quests", async (c) => {
   const { 
     name, 
     description, 
-    points_reward, 
-    difficulty, 
-    estimated_time, 
-    category, 
-    requirements, 
-    instructions, 
-    max_participants, 
-    start_date, 
-    end_date, 
-    location_area, 
-    tags 
+    points_reward
   } = await c.req.json();
   
   if (!name || !description) {
@@ -874,23 +864,13 @@ app.post("/api/quests", async (c) => {
   }
   
   const stmt = c.env.DB.prepare(`
-    INSERT INTO quests (name, description, points_reward, difficulty, estimated_time, category, requirements, instructions, max_participants, start_date, end_date, location_area, tags, is_active) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true) RETURNING *
+    INSERT INTO quests (name, description, points_reward, is_active) 
+    VALUES (?, ?, ?, true) RETURNING *
   `);
   const quest = await stmt.bind(
     name, 
     description, 
-    points_reward || 100, 
-    difficulty || 'medium', 
-    estimated_time || 120, 
-    category || 'exploration', 
-    requirements || '', 
-    instructions || '', 
-    max_participants || 100, 
-    start_date || null, 
-    end_date || null, 
-    location_area || '', 
-    tags || ''
+    points_reward || 100
   ).first();
   
   return c.json(quest);
@@ -901,17 +881,7 @@ app.put("/api/quests/:id", async (c) => {
   const { 
     name, 
     description, 
-    points_reward, 
-    difficulty, 
-    estimated_time, 
-    category, 
-    requirements, 
-    instructions, 
-    max_participants, 
-    start_date, 
-    end_date, 
-    location_area, 
-    tags 
+    points_reward
   } = await c.req.json();
   
   if (!name || !description) {
@@ -920,23 +890,13 @@ app.put("/api/quests/:id", async (c) => {
   
   const stmt = c.env.DB.prepare(`
     UPDATE quests 
-    SET name = ?, description = ?, points_reward = ?, difficulty = ?, estimated_time = ?, category = ?, requirements = ?, instructions = ?, max_participants = ?, start_date = ?, end_date = ?, location_area = ?, tags = ?
+    SET name = ?, description = ?, points_reward = ?
     WHERE id = ? RETURNING *
   `);
   const quest = await stmt.bind(
     name, 
     description, 
-    points_reward || 100, 
-    difficulty || 'medium', 
-    estimated_time || 120, 
-    category || 'exploration', 
-    requirements || '', 
-    instructions || '', 
-    max_participants || 100, 
-    start_date || null, 
-    end_date || null, 
-    location_area || '', 
-    tags || '',
+    points_reward || 100,
     questId
   ).first();
   
@@ -989,10 +949,7 @@ app.post("/api/quests/:id/steps", async (c) => {
     step_type, 
     description, 
     points_reward, 
-    target_location_id, 
-    question, 
-    answer, 
-    task_instructions 
+    target_location_id
   } = await c.req.json();
   
   if (!step_type || !description) {
@@ -1000,19 +957,17 @@ app.post("/api/quests/:id/steps", async (c) => {
   }
   
   const stmt = c.env.DB.prepare(`
-    INSERT INTO quest_steps (quest_id, step_number, step_type, description, points_reward, target_location_id, question, answer, task_instructions) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *
+    INSERT INTO quest_steps (quest_id, step_number, title, step_type, description, points_reward, target_location_id) 
+    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *
   `);
   const step = await stmt.bind(
     questId, 
     step_number || 1, 
+    description, // Use description as title
     step_type, 
     description, 
     points_reward || 15, 
-    target_location_id || null, 
-    question || null, 
-    answer || null, 
-    task_instructions || null
+    target_location_id || null
   ).first();
   
   return c.json(step);

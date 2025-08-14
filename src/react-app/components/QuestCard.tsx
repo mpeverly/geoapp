@@ -10,6 +10,11 @@ interface Quest {
   steps_completed?: number;
   category?: string;
   steps?: any[];
+  media_urls?: string;
+  tags?: string;
+  requirements?: string;
+  instructions?: string;
+  location_area?: string;
 }
 
 interface QuestCardProps {
@@ -93,6 +98,32 @@ export function QuestCard({ quest, onStartQuest, isStarted, onCompleteStep }: Qu
             <span>Photo required</span>
           </div>
         </div>
+
+        {/* Media Preview */}
+        {quest.media_urls && quest.media_urls.trim() && (
+          <div className="mt-4">
+            <div className="text-xs opacity-80 mb-2">Preview:</div>
+            <div className="grid grid-cols-2 gap-2">
+              {quest.media_urls.split(',').filter(url => url.trim()).slice(0, 2).map((url, index) => (
+                <div key={index} className="aspect-square bg-white/20 rounded-lg overflow-hidden">
+                  {url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                    <img
+                      src={`https://photos.dev.cloudflare.com/${url.trim()}`}
+                      alt={`Quest preview ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <video
+                      src={`https://photos.dev.cloudflare.com/${url.trim()}`}
+                      className="w-full h-full object-cover"
+                      muted
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quest steps preview */}
@@ -112,12 +143,33 @@ export function QuestCard({ quest, onStartQuest, isStarted, onCompleteStep }: Qu
                   <div className="font-medium text-sm text-gray-800">{step.title}</div>
                   <div className="text-xs text-gray-500">{step.location_name}</div>
                 </div>
-                <button
-                  onClick={() => onCompleteStep?.(step.step_number)}
-                  className="px-3 py-1 bg-green-500 text-white text-xs rounded-full hover:bg-green-600 transition-colors"
-                >
-                  Complete
-                </button>
+                <div className="flex gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // For now, just complete the step without uploading
+                        onCompleteStep?.(step.step_number);
+                      }
+                    }}
+                    className="hidden"
+                    id={`photo-upload-${step.id}`}
+                  />
+                  <label
+                    htmlFor={`photo-upload-${step.id}`}
+                    className="px-3 py-1 bg-blue-500 text-white text-xs rounded-full hover:bg-blue-600 transition-colors cursor-pointer"
+                  >
+                    📸 Upload Photo
+                  </label>
+                  <button
+                    onClick={() => onCompleteStep?.(step.step_number)}
+                    className="px-3 py-1 bg-green-500 text-white text-xs rounded-full hover:bg-green-600 transition-colors"
+                  >
+                    Complete
+                  </button>
+                </div>
               </div>
             ))}
             {quest.steps.length > 3 && (

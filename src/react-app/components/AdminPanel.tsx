@@ -47,6 +47,7 @@ interface Quest {
   end_date?: string;
   location_area: string;
   tags: string[];
+  media_urls?: string[];
 }
 
 interface QuestStep {
@@ -60,6 +61,7 @@ interface QuestStep {
   question?: string;
   answer?: string;
   task_instructions?: string;
+  media_urls?: string[];
 }
 
 interface AdminPanelProps {
@@ -101,7 +103,9 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
     end_date: '',
     location_area: '',
     tags: [] as string[],
-    tagInput: ''
+    tagInput: '',
+    media_files: [] as File[],
+    media_urls: [] as string[]
   });
 
   const [stepFormData, setStepFormData] = useState({
@@ -112,7 +116,9 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
     target_location_id: '',
     question: '',
     answer: '',
-    task_instructions: ''
+    task_instructions: '',
+    media_files: [] as File[],
+    media_urls: [] as string[]
   });
 
   // Load quests on component mount
@@ -152,6 +158,7 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
         body: JSON.stringify({
           ...questFormData,
           tags: questFormData.tags.join(','),
+          media_urls: questFormData.media_urls.join(','),
           is_active: true
         })
       });
@@ -173,7 +180,9 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
           end_date: '',
           location_area: '',
           tags: [],
-          tagInput: ''
+          tagInput: '',
+          media_files: [],
+          media_urls: []
         });
         alert('Adventure created successfully!');
       } else {
@@ -196,6 +205,7 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
         body: JSON.stringify({
           ...questFormData,
           tags: questFormData.tags.join(','),
+          media_urls: questFormData.media_urls.join(','),
           is_active: true
         })
       });
@@ -218,7 +228,9 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
           end_date: '',
           location_area: '',
           tags: [],
-          tagInput: ''
+          tagInput: '',
+          media_files: [],
+          media_urls: []
         });
         alert('Adventure updated successfully!');
       } else {
@@ -269,7 +281,9 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
       end_date: quest.end_date || '',
       location_area: quest.location_area || '',
       tags: typeof quest.tags === 'string' ? quest.tags.split(',').filter(tag => tag.trim()) : (quest.tags || []),
-      tagInput: ''
+      tagInput: '',
+      media_files: [],
+      media_urls: typeof quest.media_urls === 'string' ? quest.media_urls.split(',').filter(url => url.trim()) : (quest.media_urls || [])
     });
   };
 
@@ -282,7 +296,8 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...stepFormData,
-          target_location_id: stepFormData.target_location_id ? parseInt(stepFormData.target_location_id) : null
+          target_location_id: stepFormData.target_location_id ? parseInt(stepFormData.target_location_id) : null,
+          media_urls: stepFormData.media_urls.join(',')
         })
       });
       
@@ -296,7 +311,9 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
           target_location_id: '',
           question: '',
           answer: '',
-          task_instructions: ''
+          task_instructions: '',
+          media_files: [],
+          media_urls: []
         });
         alert('Quest step added successfully!');
       } else {
@@ -463,6 +480,65 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
       ...questFormData,
       tags: questFormData.tags.filter(tag => tag !== tagToRemove)
     });
+  };
+
+  const handleMediaUpload = async (files: FileList, type: 'quest' | 'step') => {
+    const uploadedUrls: string[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Get upload URL
+      const urlResponse = await fetch('/api/photos/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: `adventure-media/${Date.now()}-${file.name}`,
+          contentType: file.type
+        })
+      });
+      
+      if (urlResponse.ok) {
+        const { uploadUrl, key } = await urlResponse.json();
+        
+        // Upload file
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type }
+        });
+        
+        if (uploadResponse.ok) {
+          uploadedUrls.push(key);
+        }
+      }
+    }
+    
+    if (type === 'quest') {
+      setQuestFormData({
+        ...questFormData,
+        media_urls: [...questFormData.media_urls, ...uploadedUrls]
+      });
+    } else {
+      setStepFormData({
+        ...stepFormData,
+        media_urls: [...stepFormData.media_urls, ...uploadedUrls]
+      });
+    }
+  };
+
+  const removeMedia = (url: string, type: 'quest' | 'step') => {
+    if (type === 'quest') {
+      setQuestFormData({
+        ...questFormData,
+        media_urls: questFormData.media_urls.filter(u => u !== url)
+      });
+    } else {
+      setStepFormData({
+        ...stepFormData,
+        media_urls: stepFormData.media_urls.filter(u => u !== url)
+      });
+    }
   };
 
   const selectQuest = (quest: Quest) => {
@@ -713,6 +789,63 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
                         ))}
                       </div>
                     </div>
+
+                    <div className="lg:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Adventure Media</label>
+                      <p className="text-sm text-gray-600 mb-3">Upload pictures and videos that show what participants should expect or capture</p>
+                      
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,video/*"
+                          onChange={(e) => e.target.files && handleMediaUpload(e.target.files, 'quest')}
+                          className="hidden"
+                          id="quest-media-upload"
+                        />
+                        <label
+                          htmlFor="quest-media-upload"
+                          className="cursor-pointer flex flex-col items-center"
+                        >
+                          <Camera className="w-8 h-8 text-gray-400 mb-2" />
+                          <span className="text-sm text-gray-600">Click to upload media files</span>
+                          <span className="text-xs text-gray-500">Supports images and videos</span>
+                        </label>
+                      </div>
+                      
+                      {questFormData.media_urls.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Media:</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {questFormData.media_urls.map((url, index) => (
+                              <div key={index} className="relative group">
+                                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                                  {url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                                    <img
+                                      src={`https://photos.${process.env.NODE_ENV === 'development' ? 'dev' : 'prod'}.cloudflare.com/${url}`}
+                                      alt={`Media ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <video
+                                      src={`https://photos.${process.env.NODE_ENV === 'development' ? 'dev' : 'prod'}.cloudflare.com/${url}`}
+                                      className="w-full h-full object-cover"
+                                      controls
+                                    />
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => removeMedia(url, 'quest')}
+                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="flex gap-3 mt-6">
@@ -921,6 +1054,63 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
                           />
                         </div>
                       )}
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Step Media</label>
+                        <p className="text-sm text-gray-600 mb-3">Upload example images or videos for this step</p>
+                        
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*,video/*"
+                            onChange={(e) => e.target.files && handleMediaUpload(e.target.files, 'step')}
+                            className="hidden"
+                            id="step-media-upload"
+                          />
+                          <label
+                            htmlFor="step-media-upload"
+                            className="cursor-pointer flex flex-col items-center"
+                          >
+                            <Camera className="w-6 h-6 text-gray-400 mb-2" />
+                            <span className="text-sm text-gray-600">Click to upload media files</span>
+                            <span className="text-xs text-gray-500">Supports images and videos</span>
+                          </label>
+                        </div>
+                        
+                        {stepFormData.media_urls.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Media:</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              {stepFormData.media_urls.map((url, index) => (
+                                <div key={index} className="relative group">
+                                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                                    {url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                                      <img
+                                        src={`https://photos.${process.env.NODE_ENV === 'development' ? 'dev' : 'prod'}.cloudflare.com/${url}`}
+                                        alt={`Step Media ${index + 1}`}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <video
+                                        src={`https://photos.${process.env.NODE_ENV === 'development' ? 'dev' : 'prod'}.cloudflare.com/${url}`}
+                                        className="w-full h-full object-cover"
+                                        controls
+                                      />
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => removeMedia(url, 'step')}
+                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="flex gap-3 mt-4">

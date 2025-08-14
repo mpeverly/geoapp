@@ -21,6 +21,7 @@ import { LocationMap } from "./components/LocationMap";
 import { CheckInCard } from "./components/CheckInCard";
 import { QuestCard } from "./components/QuestCard";
 import { AdminPanel } from "./components/AdminPanel";
+import { QuestTracker } from "./components/QuestTracker";
 
 interface User {
   id: number;
@@ -72,6 +73,11 @@ interface Quest {
   steps_required?: number;
   steps_completed?: number;
   category?: string;
+  media_urls?: string;
+  tags?: string;
+  requirements?: string;
+  instructions?: string;
+  location_area?: string;
 }
 
 function App() {
@@ -83,7 +89,7 @@ function App() {
   const [userQuests, setUserQuests] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessPartner | null>(null);
-  const [activeTab, setActiveTab] = useState<'explore' | 'quests' | 'profile' | 'leaderboard' | 'admin'>('explore');
+  const [activeTab, setActiveTab] = useState<'explore' | 'quests' | 'quest-tracker' | 'profile' | 'leaderboard' | 'admin'>('explore');
   const [isLoading, setIsLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -100,6 +106,19 @@ function App() {
       fetchUser(userId);
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      // Create a mock user for testing
+      const mockUser = {
+        id: 1,
+        email: 'demo@example.com',
+        name: 'Demo User',
+        points: 150,
+        level: 2,
+        experience: 50,
+        achievements: 3,
+        checkins: 15
+      };
+      setUser(mockUser);
     }
 
     // Check if user is admin
@@ -131,9 +150,6 @@ function App() {
     }
 
     fetchQuests();
-    if (user) {
-      fetchUserQuests(user.id);
-    }
     
     if (isAdmin) {
       fetchAllLocations();
@@ -143,7 +159,14 @@ function App() {
     
     // Hide welcome screen after 3 seconds
     setTimeout(() => setShowWelcome(false), 3000);
-  }, [user, isAdmin]);
+  }, [isAdmin]);
+
+  // Fetch user quests when user is available
+  useEffect(() => {
+    if (user) {
+      fetchUserQuests(user.id);
+    }
+  }, [user]);
 
   const fetchUser = async (userId: string) => {
     try {
@@ -166,11 +189,31 @@ function App() {
 
   const fetchUserQuests = async (userId: number) => {
     try {
-      const response = await fetch(`/api/users/${userId}/quests`);
-      if (response.ok) {
-        const data = await response.json();
-        setUserQuests(data);
+      // Get quest progress from localStorage
+      const questProgress = JSON.parse(localStorage.getItem('questProgress') || '{}');
+      const userQuestsData = [];
+      
+      // Get all quests and add progress info
+      const questsResponse = await fetch('/api/quests');
+      if (questsResponse.ok) {
+        const allQuests = await questsResponse.json();
+        
+        for (const quest of allQuests) {
+          const progress = questProgress[quest.id];
+          if (progress && progress.userId === userId) {
+            userQuestsData.push({
+              ...quest,
+              isStarted: true,
+              steps_completed: progress.completedSteps.length,
+              steps_required: progress.totalSteps,
+              isCompleted: progress.isCompleted,
+              progress: progress
+            });
+          }
+        }
       }
+      
+      setUserQuests(userQuestsData);
     } catch (error) {
       console.error('Error fetching user quests:', error);
     }
@@ -180,19 +223,37 @@ function App() {
     if (!user) return;
     
     try {
-      const response = await fetch(`/api/quests/${questId}/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id })
-      });
+      // For now, use localStorage to track quest progress
+      const questProgress = JSON.parse(localStorage.getItem('questProgress') || '{}');
       
-      if (response.ok) {
+      if (questProgress[questId]) {
+        alert('Quest already in progress!');
+        return;
+      }
+      
+      // Get quest details
+      const questResponse = await fetch(`/api/quests/${questId}`);
+      if (questResponse.ok) {
+        const quest = await questResponse.json();
+        
+        // Initialize quest progress
+        questProgress[questId] = {
+          questId,
+          userId: user.id,
+          startedAt: new Date().toISOString(),
+          completedSteps: [],
+          totalSteps: quest.steps?.length || 0,
+          isCompleted: false
+        };
+        
+        localStorage.setItem('questProgress', JSON.stringify(questProgress));
+        
+        // Update user quests
         fetchUserQuests(user.id);
-        // Show success message
-        alert('Quest started! Check the quests tab to see your progress.');
+        
+        alert(`🎉 ${quest.name} started! You have ${quest.steps?.length || 0} steps to complete.`);
       } else {
-        const error = await response.json();
-        alert(error.error || 'Failed to start quest');
+        alert('Failed to get quest details');
       }
     } catch (error) {
       console.error('Error starting quest:', error);
@@ -204,31 +265,50 @@ function App() {
     if (!user || !userLocation) return;
     
     try {
-      const response = await fetch(`/api/quests/${questId}/complete-step`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.id,
-          step_number: stepNumber,
-          latitude: userLocation.lat,
-          longitude: userLocation.lng,
-          photo_url: photoUrl
-        })
-      });
+      // Get quest progress from localStorage
+      const questProgress = JSON.parse(localStorage.getItem('questProgress') || '{}');
+      const progress = questProgress[questId];
       
-      if (response.ok) {
-        const result = await response.json();
+      if (!progress) {
+        alert('Quest not found or not started');
+        return;
+      }
+      
+      if (progress.completedSteps.includes(stepNumber)) {
+        alert('Step already completed!');
+        return;
+      }
+      
+      // Get quest details to verify step
+      const questResponse = await fetch(`/api/quests/${questId}`);
+      if (questResponse.ok) {
+        const quest = await questResponse.json();
+        const step = quest.steps?.find((s: any) => s.step_number === stepNumber);
+        
+        if (!step) {
+          alert('Step not found');
+          return;
+        }
+        
+        // For now, just mark as completed (we can add location verification later)
+        progress.completedSteps.push(stepNumber);
+        
+        // Check if quest is completed
+        if (progress.completedSteps.length >= progress.totalSteps) {
+          progress.isCompleted = true;
+          alert(`🎉 Congratulations! You've completed the ${quest.name} quest!`);
+        } else {
+          alert(`✅ Step ${stepNumber} completed! Progress: ${progress.completedSteps.length}/${progress.totalSteps}`);
+        }
+        
+        // Save progress
+        localStorage.setItem('questProgress', JSON.stringify(questProgress));
+        
+        // Update UI
         fetchUserQuests(user.id);
         fetchUser(user.id.toString());
-        
-        if (result.quest_completed) {
-          alert(`🎉 ${result.message}`);
-        } else {
-          alert(`✅ Step completed! Progress: ${result.progress}`);
-        }
       } else {
-        const error = await response.json();
-        alert(error.error || 'Failed to complete step');
+        alert('Failed to get quest details');
       }
     } catch (error) {
       console.error('Error completing quest step:', error);
@@ -276,14 +356,14 @@ function App() {
       const response = await fetch('/api/quests');
       if (response.ok) {
         const data = await response.json();
-        // Add mock data for enhanced UI
+        // Use real data from database, only add mock data for missing fields
         const enhancedData = data.map((quest: Quest) => ({
           ...quest,
-          difficulty: ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)] as 'easy' | 'medium' | 'hard',
-          estimated_time: Math.floor(Math.random() * 180) + 60,
-          steps_required: Math.floor(Math.random() * 5) + 3,
-          steps_completed: Math.floor(Math.random() * 3),
-          category: ['exploration', 'social', 'photography', 'fitness'][Math.floor(Math.random() * 4)]
+          difficulty: quest.difficulty || ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)] as 'easy' | 'medium' | 'hard',
+          estimated_time: quest.estimated_time || Math.floor(Math.random() * 180) + 60,
+          steps_required: quest.steps_required || Math.floor(Math.random() * 5) + 3,
+          steps_completed: quest.steps_completed || Math.floor(Math.random() * 3),
+          category: quest.category || ['exploration', 'social', 'photography', 'fitness'][Math.floor(Math.random() * 4)]
         }));
         setQuests(enhancedData);
       }
@@ -473,6 +553,7 @@ function App() {
             {[
               { id: 'explore', label: 'Explore', icon: MapPin, color: 'text-green-600' },
               { id: 'quests', label: 'Quests', icon: Trophy, color: 'text-green-600' },
+              { id: 'quest-tracker', label: 'Quest Tracker', icon: Target, color: 'text-blue-600' },
               { id: 'leaderboard', label: 'Leaderboard', icon: TrendingUp, color: 'text-orange-600' },
               { id: 'profile', label: 'Profile', icon: User, color: 'text-blue-600' },
               ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: Settings, color: 'text-purple-600' }] : []),
@@ -592,6 +673,23 @@ function App() {
               ))}
             </div>
           </div>
+        )}
+
+        {activeTab === 'quest-tracker' && (
+          <QuestTracker
+            userQuests={userQuests}
+            onCompleteStep={completeQuestStep}
+            onUploadPhoto={async (questId, stepNumber, file) => {
+              // Upload photo and complete step
+              try {
+                await handlePhotoUpload(file);
+                completeQuestStep(questId, stepNumber);
+              } catch (error) {
+                console.error('Error uploading photo:', error);
+                alert('Failed to upload photo');
+              }
+            }}
+          />
         )}
 
         {activeTab === 'leaderboard' && (

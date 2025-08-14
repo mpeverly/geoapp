@@ -87,6 +87,7 @@ CREATE TABLE quests (
     end_date DATE,
     location_area TEXT,
     tags TEXT,
+    media_urls TEXT, -- comma-separated list of media file URLs
     is_active BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -104,6 +105,7 @@ CREATE TABLE quest_steps (
     question TEXT,
     answer TEXT,
     task_instructions TEXT,
+    media_urls TEXT, -- comma-separated list of media file URLs
     FOREIGN KEY (quest_id) REFERENCES quests(id),
     FOREIGN KEY (target_location_id) REFERENCES locations(id),
     FOREIGN KEY (target_business_id) REFERENCES business_partners(id)
@@ -193,34 +195,34 @@ INSERT INTO business_partners (name, description, latitude, longitude, category,
 ('Meredith Village Savings Bank', 'Historic bank building', 43.6580, -71.5008, 'business', 10, 100),
 ('Meredith Public Library', 'Community library and gathering space', 43.6575, -71.5010, 'community', 15, 100);
 
-INSERT INTO quests (name, description, points_reward) VALUES
-('Weekend Warrior', 'Complete 3 different adventure locations in one weekend', 150),
-('Local Explorer', 'Visit 2 business partners and 1 scenic location', 100),
-('Photo Champion', 'Upload photos at 5 different locations', 200),
-('Meredith Sculpture Walk', 'Complete the downtown Meredith sculpture walk by visiting and photographing at least 10 sculptures. Each sculpture must be verified by GPS location to ensure you actually visit each location.', 500);
+INSERT INTO quests (name, description, points_reward, difficulty, estimated_time, category, requirements, instructions, max_participants, location_area, tags, media_urls, is_active) VALUES
+('Weekend Warrior', 'Complete 3 different adventure locations in one weekend', 150, 'medium', 120, 'exploration', 'Comfortable walking shoes, camera', 'Visit 3 different adventure locations over the weekend and check in at each one.', 100, 'Various Locations', 'weekend,adventure,exploration', '', true),
+('Local Explorer', 'Visit 2 business partners and 1 scenic location', 100, 'easy', 90, 'exploration', 'None', 'Visit local businesses and a scenic location to support the community.', 100, 'Local Area', 'local,business,community', '', true),
+('Photo Champion', 'Upload photos at 5 different locations', 200, 'medium', 180, 'photography', 'Camera or smartphone', 'Take creative photos at 5 different locations and upload them to earn points.', 100, 'Various Locations', 'photography,creative,exploration', '', true),
+('Meredith Sculpture Walk', 'Explore the beautiful sculptures throughout downtown Meredith, NH. Visit and photograph at least 10 sculptures with GPS verification to ensure you actually visit each location.', 500, 'medium', 90, 'exploration', 'Camera or smartphone for photos, comfortable walking shoes', 'Start your journey in downtown Meredith and visit each sculpture location. Take photos of each sculpture to prove your visit. GPS verification ensures you actually visit each location.', 100, 'Downtown Meredith, NH', 'sculpture,art,culture,meredith,walking', 'adventure-media/meredith-sculpture-walk-preview.jpg', true);
 
-INSERT INTO quest_steps (quest_id, step_number, title, description, step_type, target_location_id, points_reward) VALUES
-(1, 1, 'Sunrise Hike', 'Check in at any hiking trail before 8 AM', 'checkin', 1, 50),
-(1, 2, 'Scenic Stop', 'Visit a scenic location', 'checkin', 2, 50),
-(1, 3, 'Adventure Photo', 'Upload a photo from your adventure', 'photo', NULL, 50);
+INSERT INTO quest_steps (quest_id, step_number, description, step_type, target_location_id, points_reward, media_urls) VALUES
+(1, 1, 'Check in at any hiking trail before 8 AM', 'checkin', 1, 50, ''),
+(1, 2, 'Visit a scenic location', 'checkin', 2, 50, ''),
+(1, 3, 'Upload a photo from your adventure', 'photo', NULL, 50, '');
 
-INSERT INTO quest_steps (quest_id, step_number, title, description, step_type, target_business_id, points_reward) VALUES
-(2, 1, 'Gear Up', 'Visit Mountain Gear Outfitters', 'business_visit', 1, 30),
-(2, 2, 'Refuel', 'Stop by Trail''s End Cafe', 'business_visit', 2, 35),
-(2, 3, 'Scenic Adventure', 'Check in at Hidden Waterfall', 'checkin', NULL, 35);
+INSERT INTO quest_steps (quest_id, step_number, description, step_type, target_business_id, points_reward, media_urls) VALUES
+(2, 1, 'Visit Mountain Gear Outfitters', 'business_visit', 1, 30, ''),
+(2, 2, 'Stop by Trail''s End Cafe', 'business_visit', 2, 35, ''),
+(2, 3, 'Check in at Hidden Waterfall', 'checkin', NULL, 35, '');
 
 -- Meredith Sculpture Walk Quest Steps
-INSERT INTO quest_steps (quest_id, step_number, title, description, step_type, target_location_id, points_reward) VALUES
-(4, 1, 'The Fisherman', 'Visit and photograph "The Fisherman" sculpture by the lake', 'photo', 4, 25),
-(4, 2, 'Dancing Bears', 'Find and photograph the playful "Dancing Bears" sculptures', 'photo', 5, 25),
-(4, 3, 'The Reader', 'Locate and photograph "The Reader" sculpture near the library', 'photo', 6, 25),
-(4, 4, 'Lake Guardian', 'Visit the majestic "Lake Guardian" overlooking the lake', 'photo', 7, 25),
-(4, 5, 'Community Circle', 'Photograph the interactive "Community Circle" sculpture', 'photo', 8, 25),
-(4, 6, 'The Musician', 'Find and photograph "The Musician" sculpture', 'photo', 9, 25),
-(4, 7, 'Nature''s Harmony', 'Visit the organic "Nature''s Harmony" sculpture', 'photo', 10, 25),
-(4, 8, 'The Explorer', 'Locate and photograph "The Explorer" with compass', 'photo', 11, 25),
-(4, 9, 'Heritage Bridge', 'Visit the historical "Heritage Bridge" sculpture', 'photo', 12, 25),
-(4, 10, 'The Dreamer', 'Find and photograph "The Dreamer" in the garden', 'photo', 13, 25);
+INSERT INTO quest_steps (quest_id, step_number, description, step_type, target_location_id, points_reward, media_urls) VALUES
+(4, 1, 'Visit and photograph "The Fisherman" sculpture by the lake. This bronze sculpture captures the essence of Meredith''s fishing heritage.', 'photo', 4, 25, ''),
+(4, 2, 'Find and photograph the playful "Dancing Bears" sculptures in the park. These whimsical sculptures bring joy to visitors.', 'photo', 5, 25, ''),
+(4, 3, 'Locate and photograph "The Reader" sculpture near the library. This peaceful sculpture celebrates learning and community.', 'photo', 6, 25, ''),
+(4, 4, 'Visit the majestic "Lake Guardian" overlooking Lake Winnipesaukee. This sculpture represents the spirit of the lake.', 'photo', 7, 25, ''),
+(4, 5, 'Photograph the interactive "Community Circle" sculpture in the town square. This piece brings people together.', 'photo', 8, 25, ''),
+(4, 6, 'Find and photograph "The Musician" sculpture. This piece celebrates the arts and culture in Meredith.', 'photo', 9, 25, ''),
+(4, 7, 'Visit the organic "Nature''s Harmony" sculpture. This piece represents the natural beauty of the region.', 'photo', 10, 25, ''),
+(4, 8, 'Locate and photograph "The Explorer" with compass. This sculpture embodies the adventurous spirit.', 'photo', 11, 25, ''),
+(4, 9, 'Visit the historical "Heritage Bridge" sculpture near the water. This piece honors Meredith''s history.', 'photo', 12, 25, ''),
+(4, 10, 'Find and photograph "The Dreamer" in the garden. This contemplative sculpture invites reflection.', 'photo', 13, 25, '');
 
 INSERT INTO achievements (name, description, points_reward, criteria_type, criteria_value) VALUES
 ('First Steps', 'Complete your first check-in', 25, 'checkins', 1),
