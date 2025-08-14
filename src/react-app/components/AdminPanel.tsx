@@ -7,17 +7,9 @@ import {
   Save, 
   X, 
   Camera, 
-  Award,
   Target,
-  Users,
   Settings,
-  Mountain,
-  Clock,
-  Star,
-  FileText,
-  Hash,
-  Globe,
-  Calendar
+  Mountain
 } from 'lucide-react';
 
 interface Location {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ShoppingBag, LogIn, LogOut, User, CreditCard } from 'lucide-react';
 
 interface ShopifyAuthProps {

@@ -27,14 +27,14 @@ interface QuestCardProps {
 export function QuestCard({ quest, onStartQuest, isStarted, onCompleteStep }: QuestCardProps) {
   const isMeredithSculptureWalk = quest.name === 'Meredith Sculpture Walk';
   
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'text-green-600 bg-green-100';
-      case 'medium': return 'text-yellow-600 bg-yellow-100';
-      case 'hard': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
+  // const getDifficultyColor = (difficulty: string) => {
+  //   switch (difficulty) {
+  //     case 'easy': return 'text-green-600 bg-green-100';
+  //     case 'medium': return 'text-yellow-600 bg-yellow-100';
+  //     case 'hard': return 'text-red-600 bg-red-100';
+  //     default: return 'text-gray-600 bg-gray-100';
+  //   }
+  // };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {

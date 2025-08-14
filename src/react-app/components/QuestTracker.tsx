@@ -1,20 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Target, 
   Camera, 
   CheckCircle, 
-  Circle, 
   Clock, 
   Award, 
   MapPin, 
   Upload, 
   X,
   Play,
-  Pause,
   Calendar,
   BarChart3,
-  Trophy,
-  Star
+  Trophy
 } from 'lucide-react';
 
 interface QuestStep {

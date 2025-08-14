@@ -44,7 +44,6 @@ interface Location {
   longitude: number;
   category: string;
   points_reward: number;
-  radius_meters: number;
   distance_meters?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   estimated_time?: number;
@@ -261,7 +260,7 @@ function App() {
     }
   };
 
-  const completeQuestStep = async (questId: number, stepNumber: number, photoUrl?: string) => {
+  const completeQuestStep = async (questId: number, stepNumber: number, _photoUrl?: string) => {
     if (!user || !userLocation) return;
     
     try {
@@ -608,7 +607,7 @@ function App() {
                   userLocation={userLocation || undefined}
                   locations={locations}
                   businessPartners={businessPartners}
-                  onLocationSelect={setSelectedLocation}
+                  onLocationSelect={(location) => setSelectedLocation(location)}
                   onBusinessSelect={setSelectedBusiness}
                 />
               </div>

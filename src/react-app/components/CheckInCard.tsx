@@ -9,8 +9,7 @@ import {
   Zap,
   Award,
   Sparkles,
-  Target,
-  Heart
+  Target
 } from 'lucide-react';
 
 interface Location {
@@ -55,7 +54,7 @@ export function CheckInCard({ location, business, userLocation, onCheckIn, onPho
   if (!target) return null;
 
   const isLocation = !!location;
-  const iconColor = isLocation ? 'text-green-600' : 'text-orange-600';
+  // const iconColor = isLocation ? 'text-green-600' : 'text-orange-600';
   const gradientFrom = isLocation ? 'from-green-500' : 'from-orange-500';
   const gradientTo = isLocation ? 'to-emerald-600' : 'to-red-600';
   const buttonGradient = isLocation ? 'from-green-500 to-emerald-600' : 'from-orange-500 to-red-600';
