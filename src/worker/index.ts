@@ -65,6 +65,20 @@ app.use("*", cors());
 // Health check
 app.get("/api/", (c) => c.json({ name: "GeoApp Adventure Check-in API", status: "healthy" }));
 
+// Test endpoint without database
+app.get("/api/test", (c) => c.json({ message: "Worker is working", timestamp: new Date().toISOString() }));
+
+// Database test endpoint
+app.get("/api/db-test", async (c) => {
+  try {
+    const stmt = c.env.DB.prepare("SELECT COUNT(*) as count FROM quests");
+    const result = await stmt.first();
+    return c.json({ message: "Database connected", count: result?.count });
+  } catch (error) {
+    return c.json({ error: "Database error", details: String(error) }, 500);
+  }
+});
+
 // Shopify customer authentication endpoints
 app.post("/api/auth/shopify/customer", async (c) => {
   const { email, password } = await c.req.json();
@@ -571,9 +585,14 @@ app.post("/api/photos", async (c) => {
 
 // Quests endpoints
 app.get("/api/quests", async (c) => {
-  const stmt = c.env.DB.prepare("SELECT * FROM quests WHERE is_active = 1 ORDER BY name");
-  const quests = await stmt.all();
-  return c.json(quests.results);
+  try {
+    const stmt = c.env.DB.prepare("SELECT * FROM quests WHERE is_active = 1 ORDER BY name");
+    const quests = await stmt.all();
+    return c.json(quests.results);
+  } catch (error) {
+    console.error("Error fetching quests:", error);
+    return c.json({ error: "Database error", details: String(error) }, 500);
+  }
 });
 
 app.get("/api/quests/:id", async (c) => {
