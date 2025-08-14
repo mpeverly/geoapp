@@ -12,6 +12,16 @@
 - ✅ Committed the `wrangler.toml` file to the repository
 - ✅ Verified the file contains no sensitive information (no API keys)
 
+### **Problem 3: Incorrect main path in wrangler.toml**
+**Error**: `The provided Wrangler config main field (/opt/buildhome/repo/dist/geoapp/index.js) doesn't point to an existing file`
+
+**Root Cause**: The `main` field was pointing to an absolute path that doesn't exist during the build process.
+
+**Solution**:
+- ✅ Changed `main = "dist/geoapp/index.js"` to `main = "index.js"`
+- ✅ Used relative path that Cloudflare expects during build
+- ✅ Verified build works locally and generates correct wrangler.json
+
 ### **Problem 2: Missing Component Exports**
 **Error**: `Failed to resolve import "./Button" from "src/react-app/shared/components/index.ts". Does the file exist?`
 
@@ -27,7 +37,7 @@
 ### **wrangler.toml Configuration**
 ```toml
 name = "geoapp"
-main = "dist/geoapp/index.js"
+main = "index.js"
 compatibility_date = "2024-03-19"
 compatibility_flags = ["nodejs_compat"]
 
