@@ -22,8 +22,7 @@ import { CheckInCard } from "./features/locations/components/CheckInCard";
 import { QuestCard } from "./features/quests/components/QuestCard";
 import { AdminPanel } from "./features/admin/components/AdminPanel";
 import { QuestTracker } from "./features/quests/components/QuestTracker";
-
-import { User, Location, Quest } from "./shared/types";
+import { User as SharedUser, Location as SharedLocation, Quest as SharedQuest } from "./shared/types";
 
 interface BusinessPartner {
   id: number;
