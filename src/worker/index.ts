@@ -896,6 +896,79 @@ app.post("/api/quests", async (c) => {
   return c.json(quest);
 });
 
+app.put("/api/quests/:id", async (c) => {
+  const questId = c.req.param("id");
+  const { 
+    name, 
+    description, 
+    points_reward, 
+    difficulty, 
+    estimated_time, 
+    category, 
+    requirements, 
+    instructions, 
+    max_participants, 
+    start_date, 
+    end_date, 
+    location_area, 
+    tags 
+  } = await c.req.json();
+  
+  if (!name || !description) {
+    return c.json({ error: "Name and description are required" }, 400);
+  }
+  
+  const stmt = c.env.DB.prepare(`
+    UPDATE quests 
+    SET name = ?, description = ?, points_reward = ?, difficulty = ?, estimated_time = ?, category = ?, requirements = ?, instructions = ?, max_participants = ?, start_date = ?, end_date = ?, location_area = ?, tags = ?
+    WHERE id = ? RETURNING *
+  `);
+  const quest = await stmt.bind(
+    name, 
+    description, 
+    points_reward || 100, 
+    difficulty || 'medium', 
+    estimated_time || 120, 
+    category || 'exploration', 
+    requirements || '', 
+    instructions || '', 
+    max_participants || 100, 
+    start_date || null, 
+    end_date || null, 
+    location_area || '', 
+    tags || '',
+    questId
+  ).first();
+  
+  if (!quest) {
+    return c.json({ error: "Quest not found" }, 404);
+  }
+  
+  return c.json(quest);
+});
+
+app.delete("/api/quests/:id", async (c) => {
+  const questId = c.req.param("id");
+  
+  // Check if quest has active users
+  const userQuestStmt = c.env.DB.prepare("SELECT COUNT(*) as count FROM user_quests WHERE quest_id = ? AND status = 'active'");
+  const userQuests = await userQuestStmt.bind(questId).first();
+  
+  if (userQuests.count > 0) {
+    return c.json({ error: "Cannot delete quest that has active participants" }, 400);
+  }
+  
+  // Delete quest steps first
+  const deleteStepsStmt = c.env.DB.prepare("DELETE FROM quest_steps WHERE quest_id = ?");
+  await deleteStepsStmt.bind(questId).run();
+  
+  // Delete the quest
+  const deleteQuestStmt = c.env.DB.prepare("DELETE FROM quests WHERE id = ?");
+  await deleteQuestStmt.bind(questId).run();
+  
+  return c.json({ message: "Quest deleted successfully" });
+});
+
 app.get("/api/quests/:id/steps", async (c) => {
   const questId = c.req.param("id");
   

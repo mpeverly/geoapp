@@ -186,6 +186,93 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
     }
   };
 
+  const handleUpdateQuest = async () => {
+    if (!editingQuest) return;
+    
+    try {
+      const response = await fetch(`/api/quests/${editingQuest.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...questFormData,
+          tags: questFormData.tags.join(','),
+          is_active: true
+        })
+      });
+      
+      if (response.ok) {
+        fetchQuests();
+        setEditingQuest(null);
+        setShowAddQuestForm(false);
+        setQuestFormData({
+          name: '',
+          description: '',
+          points_reward: 100,
+          difficulty: 'medium',
+          estimated_time: 120,
+          category: 'exploration',
+          requirements: '',
+          instructions: '',
+          max_participants: 100,
+          start_date: '',
+          end_date: '',
+          location_area: '',
+          tags: [],
+          tagInput: ''
+        });
+        alert('Adventure updated successfully!');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to update adventure');
+      }
+    } catch (error) {
+      console.error('Error updating adventure:', error);
+      alert('Failed to update adventure');
+    }
+  };
+
+  const handleDeleteQuest = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this adventure? This will also delete all associated quest steps.')) return;
+    
+    try {
+      const response = await fetch(`/api/quests/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        fetchQuests();
+        alert('Adventure deleted successfully!');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete adventure');
+      }
+    } catch (error) {
+      console.error('Error deleting adventure:', error);
+      alert('Failed to delete adventure');
+    }
+  };
+
+  const startEditQuest = (quest: Quest) => {
+    setEditingQuest(quest);
+    setShowAddQuestForm(true);
+    setQuestFormData({
+      name: quest.name,
+      description: quest.description,
+      points_reward: quest.points_reward,
+      difficulty: quest.difficulty,
+      estimated_time: quest.estimated_time,
+      category: quest.category,
+      requirements: quest.requirements || '',
+      instructions: quest.instructions || '',
+      max_participants: quest.max_participants || 100,
+      start_date: quest.start_date || '',
+      end_date: quest.end_date || '',
+      location_area: quest.location_area || '',
+      tags: typeof quest.tags === 'string' ? quest.tags.split(',').filter(tag => tag.trim()) : (quest.tags || []),
+      tagInput: ''
+    });
+  };
+
   const handleAddQuestStep = async () => {
     if (!selectedQuest) return;
     
@@ -330,6 +417,7 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
 
   const cancelEdit = () => {
     setEditingLocation(null);
+    setEditingQuest(null);
     setShowAddLocationForm(false);
     setShowAddQuestForm(false);
     setSelectedQuest(null);
@@ -341,6 +429,22 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
       category: 'sculpture',
       points_reward: 15,
       radius_meters: 50
+    });
+    setQuestFormData({
+      name: '',
+      description: '',
+      points_reward: 100,
+      difficulty: 'medium',
+      estimated_time: 120,
+      category: 'exploration',
+      requirements: '',
+      instructions: '',
+      max_participants: 100,
+      start_date: '',
+      end_date: '',
+      location_area: '',
+      tags: [],
+      tagInput: ''
     });
   };
 
@@ -432,7 +536,7 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
                 <div className="bg-gray-50 rounded-xl p-6 border-2 border-green-200">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Mountain className="w-5 h-5 text-green-600" />
-                    Create New Adventure
+                    {editingQuest ? 'Edit Adventure' : 'Create New Adventure'}
                   </h3>
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -613,14 +717,17 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
                   
                   <div className="flex gap-3 mt-6">
                     <button
-                      onClick={handleAddQuest}
+                      onClick={editingQuest ? handleUpdateQuest : handleAddQuest}
                       className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
                     >
                       <Save className="w-4 h-4" />
-                      Create Adventure
+                      {editingQuest ? 'Update Adventure' : 'Create Adventure'}
                     </button>
                     <button
-                      onClick={() => setShowAddQuestForm(false)}
+                      onClick={() => {
+                        setShowAddQuestForm(false);
+                        setEditingQuest(null);
+                      }}
                       className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2"
                     >
                       <X className="w-4 h-4" />
@@ -684,11 +791,18 @@ export function AdminPanel({ locations, onRefresh }: AdminPanelProps) {
                             Manage Steps
                           </button>
                           <button
-                            onClick={() => setEditingQuest(quest)}
+                            onClick={() => startEditQuest(quest)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="Edit"
                           >
                             <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteQuest(quest.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
