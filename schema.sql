@@ -77,6 +77,16 @@ CREATE TABLE quests (
     name TEXT NOT NULL,
     description TEXT,
     points_reward INTEGER DEFAULT 100,
+    difficulty TEXT DEFAULT 'medium', -- easy, medium, hard
+    estimated_time INTEGER DEFAULT 120, -- in minutes
+    category TEXT DEFAULT 'exploration',
+    requirements TEXT,
+    instructions TEXT,
+    max_participants INTEGER DEFAULT 100,
+    start_date DATE,
+    end_date DATE,
+    location_area TEXT,
+    tags TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -86,12 +96,14 @@ CREATE TABLE quest_steps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     quest_id INTEGER NOT NULL,
     step_number INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    description TEXT,
-    step_type TEXT NOT NULL, -- checkin, photo, social_share, business_visit
+    description TEXT NOT NULL,
+    step_type TEXT NOT NULL, -- photo, checkin, question, task
     target_location_id INTEGER,
     target_business_id INTEGER,
-    points_reward INTEGER DEFAULT 10,
+    points_reward INTEGER DEFAULT 15,
+    question TEXT,
+    answer TEXT,
+    task_instructions TEXT,
     FOREIGN KEY (quest_id) REFERENCES quests(id),
     FOREIGN KEY (target_location_id) REFERENCES locations(id),
     FOREIGN KEY (target_business_id) REFERENCES business_partners(id)

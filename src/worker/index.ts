@@ -795,4 +795,154 @@ app.get("/api/users/:id/achievements", async (c) => {
   return c.json(achievements.results);
 });
 
+// Admin endpoints for managing locations
+app.post("/api/locations", async (c) => {
+  const { name, description, latitude, longitude, category, points_reward, radius_meters } = await c.req.json();
+  
+  if (!name || !latitude || !longitude) {
+    return c.json({ error: "Name, latitude, and longitude are required" }, 400);
+  }
+  
+  const stmt = c.env.DB.prepare(`
+    INSERT INTO locations (name, description, latitude, longitude, category, points_reward, radius_meters) 
+    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *
+  `);
+  const location = await stmt.bind(name, description, latitude, longitude, category, points_reward || 15, radius_meters || 50).first();
+  
+  return c.json(location);
+});
+
+app.put("/api/locations/:id", async (c) => {
+  const locationId = c.req.param("id");
+  const { name, description, latitude, longitude, category, points_reward, radius_meters } = await c.req.json();
+  
+  if (!name || !latitude || !longitude) {
+    return c.json({ error: "Name, latitude, and longitude are required" }, 400);
+  }
+  
+  const stmt = c.env.DB.prepare(`
+    UPDATE locations 
+    SET name = ?, description = ?, latitude = ?, longitude = ?, category = ?, points_reward = ?, radius_meters = ?
+    WHERE id = ? RETURNING *
+  `);
+  const location = await stmt.bind(name, description, latitude, longitude, category, points_reward, radius_meters, locationId).first();
+  
+  if (!location) {
+    return c.json({ error: "Location not found" }, 404);
+  }
+  
+  return c.json(location);
+});
+
+app.delete("/api/locations/:id", async (c) => {
+  const locationId = c.req.param("id");
+  
+  // Check if location is used in quest steps
+  const questStepStmt = c.env.DB.prepare("SELECT COUNT(*) as count FROM quest_steps WHERE target_location_id = ?");
+  const questSteps = await questStepStmt.bind(locationId).first();
+  
+  if (questSteps.count > 0) {
+    return c.json({ error: "Cannot delete location that is used in quest steps" }, 400);
+  }
+  
+  const stmt = c.env.DB.prepare("DELETE FROM locations WHERE id = ?");
+  await stmt.bind(locationId).run();
+  
+  return c.json({ message: "Location deleted successfully" });
+});
+
+// Admin endpoints for managing quests
+app.post("/api/quests", async (c) => {
+  const { 
+    name, 
+    description, 
+    points_reward, 
+    difficulty, 
+    estimated_time, 
+    category, 
+    requirements, 
+    instructions, 
+    max_participants, 
+    start_date, 
+    end_date, 
+    location_area, 
+    tags 
+  } = await c.req.json();
+  
+  if (!name || !description) {
+    return c.json({ error: "Name and description are required" }, 400);
+  }
+  
+  const stmt = c.env.DB.prepare(`
+    INSERT INTO quests (name, description, points_reward, difficulty, estimated_time, category, requirements, instructions, max_participants, start_date, end_date, location_area, tags, is_active) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true) RETURNING *
+  `);
+  const quest = await stmt.bind(
+    name, 
+    description, 
+    points_reward || 100, 
+    difficulty || 'medium', 
+    estimated_time || 120, 
+    category || 'exploration', 
+    requirements || '', 
+    instructions || '', 
+    max_participants || 100, 
+    start_date || null, 
+    end_date || null, 
+    location_area || '', 
+    tags || ''
+  ).first();
+  
+  return c.json(quest);
+});
+
+app.get("/api/quests/:id/steps", async (c) => {
+  const questId = c.req.param("id");
+  
+  const stmt = c.env.DB.prepare(`
+    SELECT * FROM quest_steps 
+    WHERE quest_id = ? 
+    ORDER BY step_number
+  `);
+  const steps = await stmt.bind(questId).all();
+  
+  return c.json(steps.results);
+});
+
+app.post("/api/quests/:id/steps", async (c) => {
+  const questId = c.req.param("id");
+  const { 
+    step_number, 
+    step_type, 
+    description, 
+    points_reward, 
+    target_location_id, 
+    question, 
+    answer, 
+    task_instructions 
+  } = await c.req.json();
+  
+  if (!step_type || !description) {
+    return c.json({ error: "Step type and description are required" }, 400);
+  }
+  
+  const stmt = c.env.DB.prepare(`
+    INSERT INTO quest_steps (quest_id, step_number, step_type, description, points_reward, target_location_id, question, answer, task_instructions) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *
+  `);
+  const step = await stmt.bind(
+    questId, 
+    step_number || 1, 
+    step_type, 
+    description, 
+    points_reward || 15, 
+    target_location_id || null, 
+    question || null, 
+    answer || null, 
+    task_instructions || null
+  ).first();
+  
+  return c.json(step);
+});
+
 export default app;
