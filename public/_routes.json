@@ -5,5 +5,15 @@
     "/api/*",
     "/_worker.js",
     "/_worker.js.map"
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/worker.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ]
 }
