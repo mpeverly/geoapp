@@ -18,14 +18,13 @@ build/
 .env.*.local
 
 # Wrangler configuration with secrets
-wrangler.toml
 wrangler.json
 wrangler.toml.backup
 
 # Cloudflare credentials
 .wrangler/
 
-# But include template files
+# But include template files and Cloudflare deployment files
 !wrangler.toml.template
 
 # IDE files
