@@ -1,5 +1,5 @@
 name = "geoapp"
-main = "dist/geoapp/index.js"
+main = "index.js"
 compatibility_date = "2024-03-19"
 compatibility_flags = ["nodejs_compat"]
 
