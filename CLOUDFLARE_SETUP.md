@@ -74,21 +74,25 @@ The `wrangler.toml` file contains sensitive information and is excluded from Git
 ## R2 Bucket Setup
 
 1. **Enable R2 Service**:
+
    - Go to Cloudflare Dashboard → R2 Object Storage
    - Click "Enable R2" or "Get started with R2"
    - Add billing information if required
 
 2. **Create R2 Bucket**:
+
    ```bash
    npx wrangler r2 bucket create geoapp-photos
    ```
 
 3. **Verify Bucket Creation**:
+
    ```bash
    npx wrangler r2 bucket list
    ```
 
 4. **Configuration**: The bucket is automatically configured in `wrangler.toml`:
+
    ```toml
    [[r2_buckets]]
    binding = "PHOTOS"
