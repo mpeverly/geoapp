@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { serveStatic } from "hono/cloudflare-workers";
 
 interface Env {
   DB: D1Database;
@@ -991,5 +992,8 @@ app.post("/api/quests/:id/steps", async (c) => {
   
   return c.json(step);
 });
+
+// Serve static files (React app)
+app.get("/*", serveStatic({ root: "./dist" }));
 
 export default app;
