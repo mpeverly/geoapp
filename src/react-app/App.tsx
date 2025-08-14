@@ -1,30 +1,26 @@
 // src/App.tsx
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { 
   MapPin, 
   Trophy, 
   User, 
-  Star, 
-  Navigation2, 
   Compass, 
   Mountain, 
   Camera,
   Award,
   Target,
   Zap,
-  Heart,
-  Calendar,
-  Clock,
   TrendingUp,
-  Users,
   Crown,
   Gem,
-  Sparkles
+  Sparkles,
+  Settings
 } from "lucide-react";
 import { LocationMap } from "./components/LocationMap";
 import { CheckInCard } from "./components/CheckInCard";
 import { QuestCard } from "./components/QuestCard";
+import { AdminPanel } from "./components/AdminPanel";
 
 interface User {
   id: number;
@@ -47,6 +43,7 @@ interface Location {
   longitude: number;
   category: string;
   points_reward: number;
+  radius_meters: number;
   distance_meters?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   estimated_time?: number;
@@ -86,20 +83,28 @@ function App() {
   const [userQuests, setUserQuests] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessPartner | null>(null);
-  const [activeTab, setActiveTab] = useState<'explore' | 'quests' | 'profile' | 'leaderboard'>('explore');
+  const [activeTab, setActiveTab] = useState<'explore' | 'quests' | 'profile' | 'leaderboard' | 'admin'>('explore');
   const [isLoading, setIsLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminLocations, setAdminLocations] = useState<Location[]>([]);
 
   useEffect(() => {
     // Check for auth success redirect
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get('user_id');
     const authenticated = urlParams.get('authenticated');
+    const admin = urlParams.get('admin');
     
     if (userId && authenticated === 'true') {
       fetchUser(userId);
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Check if user is admin
+    if (admin === 'true') {
+      setIsAdmin(true);
     }
 
     // Get user location
@@ -129,11 +134,16 @@ function App() {
     if (user) {
       fetchUserQuests(user.id);
     }
+    
+    if (isAdmin) {
+      fetchAllLocations();
+    }
+    
     setIsLoading(false);
     
     // Hide welcome screen after 3 seconds
     setTimeout(() => setShowWelcome(false), 3000);
-  }, [user]);
+  }, [user, isAdmin]);
 
   const fetchUser = async (userId: string) => {
     try {
@@ -154,7 +164,7 @@ function App() {
     }
   };
 
-  const fetchUserQuests = async (userId: string) => {
+  const fetchUserQuests = async (userId: number) => {
     try {
       const response = await fetch(`/api/users/${userId}/quests`);
       if (response.ok) {
@@ -209,7 +219,7 @@ function App() {
       if (response.ok) {
         const result = await response.json();
         fetchUserQuests(user.id);
-        fetchUser(user.id);
+        fetchUser(user.id.toString());
         
         if (result.quest_completed) {
           alert(`🎉 ${result.message}`);
@@ -279,6 +289,18 @@ function App() {
       }
     } catch (error) {
       console.error('Error fetching quests:', error);
+    }
+  };
+
+  const fetchAllLocations = async () => {
+    try {
+      const response = await fetch('/api/locations');
+      if (response.ok) {
+        const data = await response.json();
+        setAdminLocations(data);
+      }
+    } catch (error) {
+      console.error('Error fetching all locations:', error);
     }
   };
 
@@ -453,6 +475,7 @@ function App() {
               { id: 'quests', label: 'Quests', icon: Trophy, color: 'text-green-600' },
               { id: 'leaderboard', label: 'Leaderboard', icon: TrendingUp, color: 'text-orange-600' },
               { id: 'profile', label: 'Profile', icon: User, color: 'text-blue-600' },
+              ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: Settings, color: 'text-purple-600' }] : []),
             ].map(({ id, label, icon: Icon, color }) => (
               <button
                 key={id}
@@ -501,7 +524,7 @@ function App() {
                   Adventure Map
                 </h3>
                 <LocationMap
-                  userLocation={userLocation}
+                  userLocation={userLocation || undefined}
                   locations={locations}
                   businessPartners={businessPartners}
                   onLocationSelect={setSelectedLocation}
@@ -512,7 +535,7 @@ function App() {
                 {selectedLocation && (
                   <CheckInCard
                     location={selectedLocation}
-                    userLocation={userLocation}
+                    userLocation={userLocation || undefined}
                     onCheckIn={handleCheckIn}
                     onPhotoUpload={handlePhotoUpload}
                   />
@@ -520,7 +543,7 @@ function App() {
                 {selectedBusiness && (
                   <CheckInCard
                     business={selectedBusiness}
-                    userLocation={userLocation}
+                    userLocation={userLocation || undefined}
                     onCheckIn={handleCheckIn}
                     onPhotoUpload={handlePhotoUpload}
                   />
@@ -736,7 +759,7 @@ function App() {
                         ></div>
                       </div>
                       <p className="text-sm text-gray-600">
-                        {100 - user.experience} XP needed for next level
+                        {100 - (user.experience || 0)} XP needed for next level
                       </p>
                     </div>
                   </div>
@@ -790,6 +813,16 @@ function App() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Admin Panel */}
+        {activeTab === 'admin' && (
+          <div className="max-w-6xl mx-auto px-4 py-8">
+            <AdminPanel 
+              locations={adminLocations} 
+              onRefresh={fetchAllLocations}
+            />
           </div>
         )}
       </main>
