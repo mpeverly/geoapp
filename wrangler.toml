@@ -1,0 +1,20 @@
+name = "geoapp"
+main = "dist/geoapp/index.js"
+compatibility_date = "2024-03-19"
+compatibility_flags = ["nodejs_compat"]
+
+[env.development]
+vars = { ENVIRONMENT = "development" }
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "geoapp"
+database_id = "eb8e74d3-fde0-48f0-a0a0-4f2de2e40f9c"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "geoapp-photos"
+
