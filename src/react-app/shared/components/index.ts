@@ -11,3 +11,4 @@ export { default as FileUpload } from './FileUpload';
 export { default as Badge } from './Badge';
 export { default as Card } from './Card';
 export { default as Tabs } from './Tabs';
+export { default as Navigation } from './Navigation';
