@@ -50,7 +50,7 @@
     "build": "vite build",
     "build:check": "tsc -b && vite build",
     "check": "tsc && vite build",
-    "deploy": "npm run build && wrangler pages deploy dist",
+    "deploy": "npm run build",
     "dev": "vite",
     "lint": "eslint .",
     "preview": "npm run build && vite preview"
