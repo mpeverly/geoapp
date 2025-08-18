@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { 
   MapPin, 
   Trophy, 
-  User, 
+  User as UserIcon, 
   Compass, 
   Mountain, 
   Camera,
@@ -38,6 +38,22 @@ interface BusinessPartner {
   distance_meters?: number;
   special_offer?: string;
 }
+
+// Use the shared types but extend them for our needs
+type User = SharedUser & {
+  experience: number;
+  achievements: number;
+  checkins: number;
+};
+
+type Location = SharedLocation & {
+  points_reward: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type Quest = SharedQuest;
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -338,11 +354,15 @@ function App() {
     }
 
     // Debug logging
+    console.log('=== GPS DEBUG START ===');
     console.log('Frontend GPS Debug:');
     console.log(`Sending coordinates: ${lat}, ${lng}`);
     console.log(`GPS accuracy: ${gpsLocation?.accuracy || 50}m`);
     console.log(`Location ID: ${locationId}`);
     console.log(`Business ID: ${businessId}`);
+    
+    // Show coordinates in alert for easy viewing on phone
+    alert(`GPS Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}\nAccuracy: ${gpsLocation?.accuracy || 50}m`);
 
     try {
       const response = await fetch('/api/checkins', {
@@ -375,60 +395,127 @@ function App() {
             checkins: Math.floor(newPoints / 10)
           });
           return { verified: true, points: result.points_earned, ...result };
+        } else {
+          // Show detailed failure info
+          const distance = result.distance_meters || 0;
+          const accuracy = result.user_accuracy || 0;
+          alert(`❌ Check-in failed!\nDistance: ${distance.toFixed(1)}m\nYour accuracy: ${accuracy.toFixed(1)}m\nYour coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
         }
       }
-      return { verified: false, ...result };
+      return { verified: false };
     } catch (error) {
       console.error('Check-in error:', error);
       return { verified: false };
     }
   };
 
-  const handlePhotoUpload = async (file: File) => {
+  const handlePhotoUpload = async (file: File, locationId?: number, stepId?: number) => {
+    if (!user) return false;
+
+    try {
+      // Create a mock URL for the photo (in real app, this would upload to Cloudflare R2)
+      const mockPhotoUrl = `https://example.com/photos/${Date.now()}.jpg`;
+      
+      // Save photo record
+      const photoResponse = await fetch('/api/photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          location_id: locationId,
+          step_id: stepId,
+          filename: file.name,
+          url: mockPhotoUrl,
+          metadata: {
+            file_size: file.size,
+            file_type: file.type,
+            uploaded_at: new Date().toISOString()
+          }
+        })
+      });
+
+      if (photoResponse.ok) {
+        const photo = await photoResponse.json();
+        const newPoints = user.points + photo.points_earned;
+        setUser({ 
+          ...user, 
+          points: newPoints,
+          level: Math.floor(newPoints / 100) + 1,
+          experience: newPoints % 100
+        });
+        
+        console.log('Photo uploaded successfully:', photo);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      return false;
+    }
+  };
+
+  const handleQuestStepComplete = async (stepId: number, photoFile?: File) => {
+    if (!user) return false;
+
+    try {
+      let photoId = null;
+      
+      // Upload photo if provided
+      if (photoFile) {
+        const photoSuccess = await handlePhotoUpload(photoFile, undefined, stepId);
+        if (photoSuccess) {
+          photoId = Date.now(); // Mock photo ID
+        }
+      }
+
+      // Complete the step
+      const stepResponse = await fetch('/api/quest-steps/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          quest_id: 1, // Meredith Sculpture Walk
+          step_id: stepId,
+          photo_id: photoId,
+          location_id: stepId // Using step ID as location ID for now
+        })
+      });
+
+      if (stepResponse.ok) {
+        const stepCompletion = await stepResponse.json();
+        const newPoints = user.points + stepCompletion.points_earned;
+        setUser({ 
+          ...user, 
+          points: newPoints,
+          level: Math.floor(newPoints / 100) + 1,
+          experience: newPoints % 100
+        });
+        
+        console.log('Step completed successfully:', stepCompletion);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error completing step:', error);
+      return false;
+    }
+  };
+
+  const fetchQuestProgress = async (questId: number) => {
     if (!user) return;
 
     try {
-      // Get upload URL
-      const urlResponse = await fetch('/api/photos/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type })
-      });
-
-      if (urlResponse.ok) {
-        const { uploadUrl, url } = await urlResponse.json();
-        
-        // Upload file
-        await fetch(uploadUrl, {
-          method: "PUT",
-          body: file,
-          headers: { 'Content-Type': file.type }
-        });
-
-        // Save photo record
-        const photoResponse = await fetch('/api/photos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: user.id,
-            filename: file.name,
-            url: url
-          })
-        });
-
-        if (photoResponse.ok) {
-          const photo = await photoResponse.json();
-          const newPoints = user.points + photo.points_earned;
-          setUser({ 
-            ...user, 
-            points: newPoints,
-            level: Math.floor(newPoints / 100) + 1,
-            experience: newPoints % 100
-          });
-        }
+      const response = await fetch(`/api/quest-progress/${user.id}/${questId}`);
+      if (response.ok) {
+        const progress = await response.json();
+        console.log('Quest progress:', progress);
+        // You can store this in state if needed
+        return progress;
       }
     } catch (error) {
-      console.error('Error uploading photo:', error);
+      console.error('Error fetching quest progress:', error);
     }
   };
 
@@ -525,7 +612,7 @@ function App() {
               { id: 'quests', label: 'Quests', icon: Trophy, color: 'text-green-600' },
               { id: 'quest-tracker', label: 'Quest Tracker', icon: Target, color: 'text-blue-600' },
               { id: 'leaderboard', label: 'Leaderboard', icon: TrendingUp, color: 'text-orange-600' },
-              { id: 'profile', label: 'Profile', icon: User, color: 'text-blue-600' },
+              { id: 'profile', label: 'Profile', icon: UserIcon, color: 'text-blue-600' },
               ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: Settings, color: 'text-purple-600' }] : []),
             ].map(({ id, label, icon: Icon, color }) => (
               <button
@@ -732,7 +819,7 @@ function App() {
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-white" />
+                        <UserIcon className="w-6 h-6 text-white" />
                       </div>
                       <div>
                         <h4 className="font-semibold">{user.name}</h4>
@@ -775,7 +862,7 @@ function App() {
                         />
                       ) : (
                         <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full mx-auto mb-4 flex items-center justify-center">
-                          <User className="w-12 h-12 text-white" />
+                          <UserIcon className="w-12 h-12 text-white" />
                         </div>
                       )}
                       <h3 className="text-2xl font-bold text-gray-900">{user.name}</h3>
