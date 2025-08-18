@@ -285,36 +285,25 @@ function App() {
 
   const fetchNearbyLocations = async (lat: number, lng: number) => {
     try {
-      const response = await fetch(`/api/locations/nearby?lat=${lat}&lon=${lng}&radius=50000`);
+      const response = await fetch(`/api/locations/nearby?lat=${lat}&lng=${lng}&radius=50000`);
       if (response.ok) {
-        const data = await response.json();
-        // Add mock data for enhanced UI
-        const enhancedData = data.map((loc: Location) => ({
-          ...loc,
-          difficulty: ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)] as 'easy' | 'medium' | 'hard',
-          estimated_time: Math.floor(Math.random() * 120) + 30
-        }));
-        setLocations(enhancedData);
+        const locationsData = await response.json();
+        setLocations(locationsData);
       }
     } catch (error) {
-      console.error('Error fetching locations:', error);
+      console.error('Error fetching nearby locations:', error);
     }
   };
 
   const fetchNearbyBusinesses = async (lat: number, lng: number) => {
     try {
-      const response = await fetch(`/api/partners/nearby?lat=${lat}&lon=${lng}&radius=50000`);
+      const response = await fetch(`/api/partners/nearby?lat=${lat}&lng=${lng}&radius=50000`);
       if (response.ok) {
-        const data = await response.json();
-        // Add mock data for enhanced UI
-        const enhancedData = data.map((business: BusinessPartner) => ({
-          ...business,
-          special_offer: ['20% off', 'Free coffee', 'BOGO deal', 'VIP access'][Math.floor(Math.random() * 4)]
-        }));
-        setBusinessPartners(enhancedData);
+        const businessesData = await response.json();
+        setBusinessPartners(businessesData);
       }
     } catch (error) {
-      console.error('Error fetching businesses:', error);
+      console.error('Error fetching nearby businesses:', error);
     }
   };
 
@@ -322,17 +311,8 @@ function App() {
     try {
       const response = await fetch('/api/quests');
       if (response.ok) {
-        const data = await response.json();
-        // Use real data from database, only add mock data for missing fields
-        const enhancedData = data.map((quest: Quest) => ({
-          ...quest,
-          difficulty: quest.difficulty || ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)] as 'easy' | 'medium' | 'hard',
-          estimated_time: quest.estimated_time || Math.floor(Math.random() * 180) + 60,
-          steps_required: quest.steps_required || Math.floor(Math.random() * 5) + 3,
-          steps_completed: quest.steps_completed || Math.floor(Math.random() * 3),
-          category: quest.category || ['exploration', 'social', 'photography', 'fitness'][Math.floor(Math.random() * 4)]
-        }));
-        setQuests(enhancedData);
+        const questsData = await response.json();
+        setQuests(questsData);
       }
     } catch (error) {
       console.error('Error fetching quests:', error);
@@ -343,8 +323,8 @@ function App() {
     try {
       const response = await fetch('/api/locations');
       if (response.ok) {
-        const data = await response.json();
-        setAdminLocations(data);
+        const locationsData = await response.json();
+        setAdminLocations(locationsData);
       }
     } catch (error) {
       console.error('Error fetching all locations:', error);
