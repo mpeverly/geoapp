@@ -91,12 +91,14 @@ npm install
 **Important**: This application contains sensitive API credentials. Follow the security setup:
 
 1. **Copy configuration templates:**
+
    ```bash
    cp wrangler.toml.example wrangler.toml
    cp wrangler.json.example wrangler.json
    ```
 
 2. **Update with your credentials** (see [SETUP.md](./SETUP.md) for detailed instructions):
+
    - Shopify store domain
    - Shopify Admin API access token
    - Cloudflare D1 database ID
@@ -111,6 +113,7 @@ npm install
 ### 3. Shopify Setup
 
 1. **Create a Private App in Shopify:**
+
    - Go to your Shopify admin → Apps → Private apps
    - Create a new private app with Admin API access
    - Set scopes: `read_customers`, `read_shop`

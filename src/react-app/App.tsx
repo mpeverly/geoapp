@@ -15,7 +15,8 @@ import {
   Crown,
   Gem,
   Sparkles,
-  Settings
+  Settings,
+  Navigation
 } from "lucide-react";
 import { LocationMap } from "./features/locations/components/LocationMap";
 import { CheckInCard } from "./features/locations/components/CheckInCard";
@@ -23,6 +24,8 @@ import { QuestCard } from "./features/quests/components/QuestCard";
 import { AdminPanel } from "./features/admin/components/AdminPanel";
 import { QuestTracker } from "./features/quests/components/QuestTracker";
 import { User as SharedUser, Location as SharedLocation, Quest as SharedQuest } from "./shared/types";
+import { useEnhancedGPS } from "./shared/hooks/useEnhancedGPS";
+import { GPSIndicator } from "./shared/components/GPSIndicator";
 
 interface BusinessPartner {
   id: number;
@@ -38,7 +41,6 @@ interface BusinessPartner {
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [businessPartners, setBusinessPartners] = useState<BusinessPartner[]>([]);
   const [quests, setQuests] = useState<Quest[]>([]);
@@ -50,6 +52,26 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLocations, setAdminLocations] = useState<Location[]>([]);
+
+  // Enhanced GPS hook
+  const {
+    location: gpsLocation,
+    accuracy,
+    accuracyStatus,
+    isLoading: gpsLoading,
+    isWatching,
+    error: gpsError,
+    hasPermission,
+    getLocation,
+    startWatching,
+    stopWatching,
+    requestPermission,
+    isWithinRadius,
+    debugInfo
+  } = useEnhancedGPS(true);
+
+  // Convert GPS location to the format expected by other components
+  const userLocation = gpsLocation ? { lat: gpsLocation.latitude, lng: gpsLocation.longitude } : null;
 
   useEffect(() => {
     // Check for auth success redirect
@@ -82,27 +104,16 @@ function App() {
       setIsAdmin(true);
     }
 
-    // Get user location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const coords = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setUserLocation(coords);
-          fetchNearbyLocations(coords.lat, coords.lng);
-          fetchNearbyBusinesses(coords.lat, coords.lng);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          // Default to Meredith coordinates for the sculpture walk
-          const defaultCoords = { lat: 43.6578, lng: -71.5003 };
-          setUserLocation(defaultCoords);
-          fetchNearbyLocations(defaultCoords.lat, defaultCoords.lng);
-          fetchNearbyBusinesses(defaultCoords.lat, defaultCoords.lng);
-        }
-      );
+    // Enhanced GPS location handling
+    if (gpsLocation) {
+      fetchNearbyLocations(gpsLocation.latitude, gpsLocation.longitude);
+      fetchNearbyBusinesses(gpsLocation.latitude, gpsLocation.longitude);
+    } else if (gpsError) {
+      console.error('GPS Error:', gpsError);
+      // Default to Meredith coordinates for the sculpture walk
+      const defaultCoords = { lat: 43.6578, lng: -71.5003 };
+      fetchNearbyLocations(defaultCoords.lat, defaultCoords.lng);
+      fetchNearbyBusinesses(defaultCoords.lat, defaultCoords.lng);
     }
 
     fetchQuests();
@@ -355,12 +366,15 @@ function App() {
           location_id: locationId,
           business_partner_id: businessId,
           latitude: lat,
-          longitude: lng
+          longitude: lng,
+          accuracy: gpsLocation?.accuracy || 50 // Include GPS accuracy
         })
       });
 
       if (response.ok) {
         const result = await response.json();
+        console.log('Check-in result:', result);
+        
         if (result.verified) {
           const newPoints = user.points + result.points_earned;
           const newLevel = Math.floor(newPoints / 100) + 1;
@@ -373,10 +387,10 @@ function App() {
             achievements: Math.floor(newPoints / 50),
             checkins: Math.floor(newPoints / 10)
           });
-          return { verified: true, points: result.points_earned };
+          return { verified: true, points: result.points_earned, ...result };
         }
       }
-      return { verified: false };
+      return { verified: false, ...result };
     } catch (error) {
       console.error('Check-in error:', error);
       return { verified: false };
@@ -497,6 +511,19 @@ function App() {
                   </div>
                 </div>
               )}
+              
+              {/* GPS Status Indicator */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 flex items-center space-x-2">
+                <Navigation className={`w-4 h-4 ${accuracyStatus.color.replace('text-', 'text-')}`} />
+                <div className="text-white text-sm">
+                  <div className="font-semibold">{accuracyStatus.message}</div>
+                  {gpsLocation && (
+                    <div className="text-xs opacity-75">
+                      {accuracy.toFixed(1)}m • {isWatching ? 'Active' : 'Inactive'}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -554,8 +581,8 @@ function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
                 <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                   <MapPin className="w-6 h-6 mr-2 text-green-600" />
                   Adventure Map
@@ -569,6 +596,15 @@ function App() {
                 />
               </div>
               <div className="space-y-6">
+                {/* GPS Status Panel */}
+                <GPSIndicator
+                  accuracy={accuracy}
+                  isWatching={isWatching}
+                  error={gpsError}
+                  hasPermission={hasPermission}
+                  onRequestPermission={requestPermission}
+                />
+                
                 {selectedLocation && (
                   <CheckInCard
                     location={selectedLocation}

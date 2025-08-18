@@ -85,8 +85,11 @@ export function CheckInCard({ location, business, userLocation, onCheckIn, onPho
       
       if (result.verified) {
         setCheckedIn(true);
+        alert('✅ Check-in successful! Great job finding this location.');
       } else {
-        alert('Check-in failed: You may be too far from the location');
+        const distance = result.distance_meters || 0;
+        const accuracy = result.user_accuracy || 0;
+        alert(`❌ Check-in failed: You are ${distance.toFixed(1)}m away from the location. GPS accuracy: ${accuracy.toFixed(1)}m. Please move closer and try again.`);
       }
     } catch (error) {
       alert('Check-in failed. Please try again.');

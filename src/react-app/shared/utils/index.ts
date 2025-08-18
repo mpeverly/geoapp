@@ -3,26 +3,354 @@
 import { Coordinates } from '../types';
 
 /**
+ * Enhanced GPS location utilities for high accuracy
+ */
+
+interface GPSOptions {
+  enableHighAccuracy?: boolean;
+  timeout?: number;
+  maximumAge?: number;
+  minAccuracy?: number; // Minimum accuracy in meters
+  maxAttempts?: number; // Maximum attempts to get accurate location
+  continuous?: boolean; // Whether to continuously monitor location
+}
+
+interface GPSLocation {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  timestamp: number;
+  altitude?: number;
+  heading?: number;
+  speed?: number;
+}
+
+interface GPSState {
+  isWatching: boolean;
+  currentLocation: GPSLocation | null;
+  accuracyHistory: GPSLocation[];
+  lastUpdate: number;
+  error: string | null;
+}
+
+// Global GPS state for continuous monitoring
+let gpsState: GPSState = {
+  isWatching: false,
+  currentLocation: null,
+  accuracyHistory: [],
+  lastUpdate: 0,
+  error: null
+};
+
+let watchId: number | null = null;
+
+/**
  * Calculate distance between two coordinates using Haversine formula
  */
 export function calculateDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
+  lat1: number, 
+  lon1: number, 
+  lat2: number, 
   lon2: number
 ): number {
-  const R = 6371e3; // Earth's radius in meters
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
 
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+/**
+ * Get the most accurate location from history
+ */
+function getMostAccurateLocation(history: GPSLocation[]): GPSLocation | null {
+  if (history.length === 0) return null;
+  
+  // Sort by accuracy (lower is better) and recency
+  const sorted = history.sort((a, b) => {
+    // Prioritize accuracy, then recency
+    const accuracyDiff = a.accuracy - b.accuracy;
+    if (Math.abs(accuracyDiff) > 5) { // If accuracy difference is significant
+      return accuracyDiff;
+    }
+    return b.timestamp - a.timestamp; // Otherwise prefer newer
+  });
+  
+  return sorted[0];
+}
 
-  return R * c; // Distance in meters
+/**
+ * Enhanced getCurrentLocation with multiple accuracy improvements
+ */
+export function getCurrentLocation(options: GPSOptions = {}): Promise<GPSLocation> {
+  const {
+    enableHighAccuracy = true,
+    timeout = 30000, // 30 seconds
+    maximumAge = 0, // Don't use cached location
+    minAccuracy = 10, // Require 10 meters or better accuracy
+    maxAttempts = 5
+  } = options;
+
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by this browser.'));
+      return;
+    }
+
+    let attempts = 0;
+    let bestLocation: GPSLocation | null = null;
+
+    const successCallback = (position: GeolocationPosition) => {
+      const location: GPSLocation = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy || 999,
+        timestamp: position.timestamp,
+        altitude: position.coords.altitude || undefined,
+        heading: position.coords.heading || undefined,
+        speed: position.coords.speed || undefined
+      };
+
+      // Update global state
+      gpsState.currentLocation = location;
+      gpsState.accuracyHistory.push(location);
+      gpsState.lastUpdate = Date.now();
+      gpsState.error = null;
+
+      // Keep only recent history (last 10 readings)
+      if (gpsState.accuracyHistory.length > 10) {
+        gpsState.accuracyHistory = gpsState.accuracyHistory.slice(-10);
+      }
+
+      // Check if accuracy is good enough
+      if (location.accuracy <= minAccuracy) {
+        resolve(location);
+        return;
+      }
+
+      // If not accurate enough, try again
+      attempts++;
+      if (attempts < maxAttempts) {
+        console.log(`GPS attempt ${attempts}: Accuracy ${location.accuracy}m, trying again...`);
+        setTimeout(() => {
+          navigator.geolocation.getCurrentPosition(successCallback, errorCallback, geoOptions);
+        }, 1000);
+      } else {
+        // Use the best location we got
+        bestLocation = getMostAccurateLocation(gpsState.accuracyHistory);
+        if (bestLocation) {
+          console.log(`Using best available accuracy: ${bestLocation.accuracy}m`);
+          resolve(bestLocation);
+        } else {
+          reject(new Error('Unable to get accurate location after multiple attempts'));
+        }
+      }
+    };
+
+    const errorCallback = (error: GeolocationPositionError) => {
+      let errorMessage = 'Failed to get location';
+      
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage = 'Location permission denied. Please enable location access.';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = 'Location information unavailable. Please check your GPS settings.';
+          break;
+        case error.TIMEOUT:
+          errorMessage = 'Location request timed out. Please try again.';
+          break;
+      }
+
+      gpsState.error = errorMessage;
+      reject(new Error(errorMessage));
+    };
+
+    const geoOptions: PositionOptions = {
+      enableHighAccuracy,
+      timeout,
+      maximumAge
+    };
+
+    // Start the location request
+    navigator.geolocation.getCurrentPosition(successCallback, errorCallback, geoOptions);
+  });
+}
+
+/**
+ * Start continuous GPS monitoring for better accuracy
+ */
+export function startGPSMonitoring(options: GPSOptions = {}): void {
+  if (gpsState.isWatching) {
+    console.log('GPS monitoring already active');
+    return;
+  }
+
+  if (!navigator.geolocation) {
+    console.error('Geolocation not supported');
+    return;
+  }
+
+  const {
+    enableHighAccuracy = true,
+    timeout = 30000,
+    maximumAge = 5000 // 5 seconds cache
+  } = options;
+
+  const successCallback = (position: GeolocationPosition) => {
+    const location: GPSLocation = {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy || 999,
+      timestamp: position.timestamp,
+      altitude: position.coords.altitude || undefined,
+      heading: position.coords.heading || undefined,
+      speed: position.coords.speed || undefined
+    };
+
+    // Update state
+    gpsState.currentLocation = location;
+    gpsState.accuracyHistory.push(location);
+    gpsState.lastUpdate = Date.now();
+    gpsState.error = null;
+
+    // Keep only recent history
+    if (gpsState.accuracyHistory.length > 20) {
+      gpsState.accuracyHistory = gpsState.accuracyHistory.slice(-20);
+    }
+
+    console.log(`GPS Update: ${location.accuracy}m accuracy`);
+  };
+
+  const errorCallback = (error: GeolocationPositionError) => {
+    gpsState.error = `GPS Error: ${error.message}`;
+    console.error('GPS monitoring error:', error);
+  };
+
+  const geoOptions: PositionOptions = {
+    enableHighAccuracy,
+    timeout,
+    maximumAge
+  };
+
+  watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, geoOptions);
+  gpsState.isWatching = true;
+  console.log('GPS monitoring started');
+}
+
+/**
+ * Stop continuous GPS monitoring
+ */
+export function stopGPSMonitoring(): void {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+  gpsState.isWatching = false;
+  console.log('GPS monitoring stopped');
+}
+
+/**
+ * Get current GPS state
+ */
+export function getGPSState(): GPSState {
+  return { ...gpsState };
+}
+
+/**
+ * Get the best available location (from monitoring or single request)
+ */
+export function getBestLocation(): GPSLocation | null {
+  if (gpsState.currentLocation) {
+    return gpsState.currentLocation;
+  }
+  
+  return getMostAccurateLocation(gpsState.accuracyHistory);
+}
+
+/**
+ * Check if location is within specified radius of target
+ */
+export function isLocationWithinRadius(
+  userLat: number,
+  userLon: number,
+  targetLat: number,
+  targetLon: number,
+  radiusMeters: number,
+  userAccuracy: number = 0
+): boolean {
+  const distance = calculateDistance(userLat, userLon, targetLat, targetLon);
+  
+  // Account for GPS accuracy - if user's GPS accuracy is poor, be more lenient
+  const effectiveRadius = radiusMeters + userAccuracy;
+  
+  console.log(`Distance: ${distance.toFixed(1)}m, Radius: ${radiusMeters}m, Accuracy: ${userAccuracy}m, Effective: ${effectiveRadius}m`);
+  
+  return distance <= effectiveRadius;
+}
+
+/**
+ * Get location accuracy status
+ */
+export function getAccuracyStatus(accuracy: number): {
+  status: 'excellent' | 'good' | 'fair' | 'poor';
+  message: string;
+  color: string;
+} {
+  if (accuracy <= 5) {
+    return {
+      status: 'excellent',
+      message: 'Excellent accuracy',
+      color: 'text-green-600'
+    };
+  } else if (accuracy <= 15) {
+    return {
+      status: 'good',
+      message: 'Good accuracy',
+      color: 'text-blue-600'
+    };
+  } else if (accuracy <= 50) {
+    return {
+      status: 'fair',
+      message: 'Fair accuracy',
+      color: 'text-yellow-600'
+    };
+  } else {
+    return {
+      status: 'poor',
+      message: 'Poor accuracy - move to open area',
+      color: 'text-red-600'
+    };
+  }
+}
+
+/**
+ * Request location permissions with user-friendly messaging
+ */
+export function requestLocationPermission(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(false);
+      return;
+    }
+
+    // Try to get location - this will trigger permission request
+    navigator.geolocation.getCurrentPosition(
+      () => resolve(true),
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          resolve(false);
+        } else {
+          resolve(true); // Other errors don't necessarily mean permission denied
+        }
+      },
+      { timeout: 5000, maximumAge: 0 }
+    );
+  });
 }
 
 /**
@@ -137,35 +465,6 @@ export function isValidEmail(email: string): boolean {
  */
 export function isValidCoordinates(lat: number, lon: number): boolean {
   return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
-}
-
-/**
- * Get user's current location
- */
-export function getCurrentLocation(): Promise<Coordinates> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by this browser.'));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      (error) => {
-        reject(error);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000, // 5 minutes
-      }
-    );
-  });
 }
 
 /**
