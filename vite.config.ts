@@ -22,5 +22,12 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
       },
     },
+    // Use esbuild for faster builds and avoid rollup issues
+    minify: 'esbuild',
+    target: 'es2020',
+  },
+  optimizeDeps: {
+    // Force esbuild for dependency optimization
+    force: true,
   },
 });
