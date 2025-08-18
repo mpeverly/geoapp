@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { serveStatic } from "hono/cloudflare-workers";
 
 interface Env {
   DB: D1Database;
@@ -450,7 +449,7 @@ app.get("/api/partners/nearby", async (c) => {
 
 // Check-ins endpoints
 app.post("/api/checkins", async (c) => {
-  const { user_id, location_id, latitude, longitude } = await c.req.json();
+  const { user_id, location_id, latitude, longitude, accuracy } = await c.req.json();
   
   if (!user_id || !latitude || !longitude) {
     return c.json({ error: "User ID, latitude, and longitude are required" }, 400);
@@ -459,6 +458,7 @@ app.post("/api/checkins", async (c) => {
   let verified = false;
   let distance_meters = null;
   let points_earned = 10; // Default points
+  let user_accuracy = accuracy || 50; // Default accuracy if not provided
   
   if (location_id) {
     // Verify distance to location
@@ -476,7 +476,10 @@ app.post("/api/checkins", async (c) => {
       const distanceCalc = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       distance_meters = R * distanceCalc;
       
-      if (distance_meters <= location.radius_meters) {
+      // Account for GPS accuracy in verification
+      const effectiveRadius = location.radius_meters + user_accuracy;
+      
+      if (distance_meters <= effectiveRadius) {
         verified = true;
         points_earned = location.points_reward;
       }
@@ -495,7 +498,20 @@ app.post("/api/checkins", async (c) => {
     await updatePointsStmt.bind(points_earned, user_id).run();
   }
   
-  return c.json(checkin);
+  // Return enhanced response with GPS details
+  return c.json({
+    ...checkin,
+    distance_meters: Math.round(distance_meters * 10) / 10, // Round to 1 decimal
+    user_accuracy: Math.round(user_accuracy * 10) / 10,
+    gps_details: {
+      user_lat: latitude,
+      user_lon: longitude,
+      target_lat: location?.latitude,
+      target_lon: location?.longitude,
+      radius_meters: location?.radius_meters,
+      effective_radius: location ? location.radius_meters + user_accuracy : null
+    }
+  });
 });
 
 app.post("/api/business-checkins", async (c) => {
@@ -992,8 +1008,5 @@ app.post("/api/quests/:id/steps", async (c) => {
   
   return c.json(step);
 });
-
-// Serve static files (React app)
-app.get("/*", serveStatic({ root: "./dist" }));
 
 export default app;
