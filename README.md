@@ -257,3 +257,4 @@ npx wrangler dev --local
 ---
 
 Built with ❤️ for adventure seekers and outdoor enthusiasts
+# Deployment trigger Mon Aug 18 10:49:43 EDT 2025
