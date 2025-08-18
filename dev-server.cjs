@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 
 const app = express();
 const PORT = 8788;
@@ -249,6 +248,11 @@ app.get('/api/partners/nearby', (req, res) => {
 app.post('/api/checkins', (req, res) => {
   const { user_id, location_id, business_partner_id, latitude, longitude, accuracy = 50 } = req.body;
 
+  // Debug logging
+  console.log('GPS Debug Info:');
+  console.log(`User coordinates: ${latitude}, ${longitude}`);
+  console.log(`User accuracy: ${accuracy}m`);
+
   let targetLocation = null;
   let pointsEarned = 0;
 
@@ -262,12 +266,21 @@ app.post('/api/checkins', (req, res) => {
     return res.status(404).json({ error: 'Location not found' });
   }
 
+  console.log(`Target coordinates: ${targetLocation.latitude}, ${targetLocation.longitude}`);
+
   const distance = calculateDistance(latitude, longitude, targetLocation.latitude, targetLocation.longitude);
   const effectiveRadius = targetLocation.radius_meters + accuracy;
   const verified = distance <= effectiveRadius;
 
+  console.log(`Calculated distance: ${distance}m`);
+  console.log(`Location radius: ${targetLocation.radius_meters}m`);
+  console.log(`Effective radius: ${effectiveRadius}m`);
+
   if (verified) {
     pointsEarned = targetLocation.points_reward;
+    console.log('✅ Check-in verified!');
+  } else {
+    console.log('❌ Check-in failed - too far away');
   }
 
   res.json({

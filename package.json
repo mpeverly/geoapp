@@ -55,7 +55,7 @@
     "check": "tsc && vite build",
     "deploy": "npm run build",
     "dev": "vite",
-    "dev:api": "node dev-server.js",
+    "dev:api": "node dev-server.cjs",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:api\"",
     "lint": "eslint .",
     "preview": "npm run build && vite preview"
