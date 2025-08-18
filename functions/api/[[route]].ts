@@ -235,8 +235,18 @@ app.post('/checkins', async (c) => {
     const location = mockLocations.find(loc => loc.id === location_id);
     
     if (location) {
+      // Debug logging
+      console.log('GPS Debug Info:');
+      console.log(`User coordinates: ${latitude}, ${longitude}`);
+      console.log(`Target coordinates: ${location.latitude}, ${location.longitude}`);
+      console.log(`User accuracy: ${user_accuracy}m`);
+      
       // Calculate distance using Haversine formula
       distance_meters = calculateDistance(latitude, longitude, location.latitude, location.longitude);
+      
+      console.log(`Calculated distance: ${distance_meters}m`);
+      console.log(`Location radius: ${location.radius_meters}m`);
+      console.log(`Effective radius: ${location.radius_meters + user_accuracy}m`);
       
       // Account for GPS accuracy in verification
       const effectiveRadius = location.radius_meters + user_accuracy;
@@ -244,6 +254,9 @@ app.post('/checkins', async (c) => {
       if (distance_meters <= effectiveRadius) {
         verified = true;
         points_earned = location.points_reward;
+        console.log('✅ Check-in verified!');
+      } else {
+        console.log('❌ Check-in failed - too far away');
       }
     }
   }

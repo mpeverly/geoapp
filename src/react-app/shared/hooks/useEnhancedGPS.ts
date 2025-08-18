@@ -78,6 +78,12 @@ export function useEnhancedGPS(autoStart: boolean = true): EnhancedGPSReturn {
       gpsStateRef.current = state;
       
       if (state.currentLocation) {
+        // Debug logging for GPS coordinates
+        console.log('GPS Hook Debug:');
+        console.log(`Received coordinates: ${state.currentLocation.latitude}, ${state.currentLocation.longitude}`);
+        console.log(`Accuracy: ${state.currentLocation.accuracy}m`);
+        console.log(`Timestamp: ${new Date(state.currentLocation.timestamp).toLocaleTimeString()}`);
+        
         setLocation(state.currentLocation);
       }
       

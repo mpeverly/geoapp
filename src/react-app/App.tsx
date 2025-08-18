@@ -337,6 +337,13 @@ function App() {
       return;
     }
 
+    // Debug logging
+    console.log('Frontend GPS Debug:');
+    console.log(`Sending coordinates: ${lat}, ${lng}`);
+    console.log(`GPS accuracy: ${gpsLocation?.accuracy || 50}m`);
+    console.log(`Location ID: ${locationId}`);
+    console.log(`Business ID: ${businessId}`);
+
     try {
       const response = await fetch('/api/checkins', {
         method: 'POST',
